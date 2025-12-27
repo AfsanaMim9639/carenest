@@ -1,0 +1,240 @@
+[
+  {
+    "serviceId": 1,
+    "name": "Professional Baby Care",
+    "category": "Baby Care",
+    "rate": 500,
+    "unit": "hour",
+    "description": "Experienced caregivers for your little ones with love and professional care",
+    "features": [
+      "Qualified and trained baby care professionals",
+      "Feeding, bathing, and diaper changing",
+      "Age-appropriate activities and play",
+      "Safety and hygiene protocols",
+      "Regular health monitoring"
+    ],
+    "isActive": true,
+    "popularity": 95
+  },
+  {
+    "serviceId": 2,
+    "name": "Newborn Care Specialist",
+    "category": "Baby Care",
+    "rate": 700,
+    "unit": "hour",
+    "description": "Specialized care for newborns (0-3 months) by certified specialists",
+    "features": [
+      "Certified newborn care specialists",
+      "Breastfeeding support for mothers",
+      "Sleep training and routine establishment",
+      "Umbilical cord care",
+      "Newborn health monitoring"
+    ],
+    "isActive": true,
+    "popularity": 88
+  },
+  {
+    "serviceId": 3,
+    "name": "After School Care",
+    "category": "Baby Care",
+    "rate": 450,
+    "unit": "hour",
+    "description": "Safe and engaging after-school care for school-age children",
+    "features": [
+      "Homework assistance and tutoring",
+      "Healthy snack preparation",
+      "Indoor and outdoor activities",
+      "Transportation from school (optional)",
+      "Arts, crafts, and educational games"
+    ],
+    "isActive": true,
+    "popularity": 75
+  },
+  {
+    "serviceId": 4,
+    "name": "Special Needs Child Care",
+    "category": "Baby Care",
+    "rate": 800,
+    "unit": "hour",
+    "description": "Compassionate care for children with special needs by trained professionals",
+    "features": [
+      "Trained in special needs care",
+      "Individualized care plans",
+      "Therapy support and exercises",
+      "Medication management",
+      "Sensory-friendly activities"
+    ],
+    "isActive": true,
+    "popularity": 82
+  },
+  {
+    "serviceId": 5,
+    "name": "Weekend Babysitting",
+    "category": "Baby Care",
+    "rate": 550,
+    "unit": "hour",
+    "description": "Flexible weekend babysitting services for your peace of mind",
+    "features": [
+      "Flexible scheduling (Fri-Sun)",
+      "Fun and engaging activities",
+      "Meal preparation for kids",
+      "Light housekeeping related to childcare",
+      "Emergency-trained caregivers"
+    ],
+    "isActive": true,
+    "popularity": 70
+  },
+  {
+    "serviceId": 6,
+    "name": "Senior Companion Care",
+    "category": "Elderly Care",
+    "rate": 600,
+    "unit": "hour",
+    "description": "Compassionate companionship and assistance for elderly individuals",
+    "features": [
+      "Friendly companionship and conversation",
+      "Light housekeeping assistance",
+      "Meal preparation and feeding",
+      "Medication reminders",
+      "Appointment accompaniment"
+    ],
+    "isActive": true,
+    "popularity": 90
+  },
+  {
+    "serviceId": 7,
+    "name": "Dementia & Alzheimer's Care",
+    "category": "Elderly Care",
+    "rate": 750,
+    "unit": "hour",
+    "description": "Specialized care for seniors with dementia and Alzheimer's disease",
+    "features": [
+      "Dementia-certified caregivers",
+      "Memory care activities",
+      "Safety supervision and monitoring",
+      "Behavioral management",
+      "Family support and education"
+    ],
+    "isActive": true,
+    "popularity": 85
+  },
+  {
+    "serviceId": 8,
+    "name": "Post-Hospitalization Care",
+    "category": "Elderly Care",
+    "rate": 700,
+    "unit": "hour",
+    "description": "Recovery support and care after hospital discharge",
+    "features": [
+      "Post-surgery care and monitoring",
+      "Medication administration",
+      "Wound care and dressing changes",
+      "Physical therapy assistance",
+      "Follow-up appointment coordination"
+    ],
+    "isActive": true,
+    "popularity": 78
+  },
+  {
+    "serviceId": 9,
+    "name": "Respite Care for Family",
+    "category": "Elderly Care",
+    "rate": 650,
+    "unit": "hour",
+    "description": "Temporary relief care for family caregivers",
+    "features": [
+      "Flexible scheduling for family needs",
+      "Comprehensive elderly care",
+      "Safe and engaging activities",
+      "Professional caregiver support",
+      "Peace of mind for families"
+    ],
+    "isActive": true,
+    "popularity": 72
+  },
+  {
+    "serviceId": 10,
+    "name": "24/7 Live-in Care",
+    "category": "Elderly Care",
+    "rate": 12000,
+    "unit": "day",
+    "description": "Round-the-clock live-in care for elderly individuals",
+    "features": [
+      "24/7 professional care presence",
+      "All daily living assistance",
+      "Overnight monitoring and care",
+      "Meal preparation and feeding",
+      "Emergency response capability"
+    ],
+    "isActive": true,
+    "popularity": 92
+  },
+  {
+    "serviceId": 11,
+    "name": "Nursing Care at Home",
+    "category": "Special Care",
+    "rate": 900,
+    "unit": "hour",
+    "description": "Professional nursing care in the comfort of your home",
+    "features": [
+      "Licensed and certified nurses",
+      "Medical procedures and monitoring",
+      "IV therapy and injections",
+      "Vital signs monitoring",
+      "Coordination with physicians"
+    ],
+    "isActive": true,
+    "popularity": 88
+  },
+  {
+    "serviceId": 12,
+    "name": "Chronic Disease Management",
+    "category": "Special Care",
+    "rate": 850,
+    "unit": "hour",
+    "description": "Specialized care for chronic health conditions",
+    "features": [
+      "Diabetes management and monitoring",
+      "Heart disease care protocols",
+      "COPD and respiratory support",
+      "Medication management",
+      "Lifestyle and diet guidance"
+    ],
+    "isActive": true,
+    "popularity": 80
+  },
+  {
+    "serviceId": 13,
+    "name": "Physiotherapy Support",
+    "category": "Special Care",
+    "rate": 700,
+    "unit": "hour",
+    "description": "Home-based physiotherapy and rehabilitation support",
+    "features": [
+      "Certified physiotherapy assistants",
+      "Exercise and mobility support",
+      "Post-stroke rehabilitation",
+      "Pain management techniques",
+      "Progress tracking and reporting"
+    ],
+    "isActive": true,
+    "popularity": 75
+  },
+  {
+    "serviceId": 14,
+    "name": "Palliative & Hospice Care",
+    "category": "Special Care",
+    "rate": 1000,
+    "unit": "hour",
+    "description": "Compassionate end-of-life care with dignity and comfort",
+    "features": [
+      "Pain and symptom management",
+      "Emotional and spiritual support",
+      "Family counseling and guidance",
+      "Comfort-focused care",
+      "24/7 on-call support"
+    ],
+    "isActive": true,
+    "popularity": 68
+  }
+]
