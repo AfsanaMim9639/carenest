@@ -169,20 +169,12 @@ export default function Navbar() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 20 }}
-              className="fixed top-0 right-0 bottom-0 w-80 glass-strong z-50 md:hidden overflow-y-auto"
+              className="fixed top-0 right-0 bottom-0 w-80 glass-strong md:hidden overflow-y-auto"
+              style={{ zIndex: 45 }}
             >
-              <div className="p-6">
-                {/* Close Button */}
-                <motion.button
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => setIsOpen(false)}
-                  className="absolute top-4 right-4 glass-button p-2"
-                >
-                  <X className="w-6 h-6" />
-                </motion.button>
-
+              <div className="p-6 pt-24">{/* pt-24 added to leave space for navbar */}
                 {/* Logo */}
-                <div className="flex items-center gap-3 mb-8 mt-2">
+                <div className="flex items-center gap-3 mb-8">
                   <div className="w-12 h-12 bg-gradient-to-br from-theme-50 to-theme-200 rounded-xl flex items-center justify-center">
                     <span className="text-2xl">🏥</span>
                   </div>
@@ -214,7 +206,7 @@ export default function Navbar() {
                 </div>
 
                 {/* Auth Buttons */}
-                <div className="space-y-3 pt-4 border-t border-white/10">
+                <div className="space-y-4 pt-6 border-t border-white/10">
                   {!isLoggedIn ? (
                     <>
                       <Link href="/auth/login" onClick={() => setIsOpen(false)}>
