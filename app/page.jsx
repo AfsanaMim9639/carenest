@@ -2,7 +2,10 @@ import Banner from "@/components/home/Banner";
 import AboutSection from "@/components/home/AboutSection";
 import ServicesOverview from "@/components/home/ServicesOverview";
 import Testimonials from "@/components/home/Testimonials";
-import Footer from "@/components/layout/Footer";
+//import Footer from "@/components/layout/Footer";
+import { Contact } from "lucide-react";
+
+
 
 export const metadata = {
   title: "CareNest - Trusted Care Services | Baby Care, Elderly Care & Special Care",
@@ -24,8 +27,9 @@ export default function HomePage() {
 
       {/* Testimonials & Success Metrics */}
       <Testimonials />
-
-      <Footer />
+      
+     <Contact />
+      
     </main>
   );
 }

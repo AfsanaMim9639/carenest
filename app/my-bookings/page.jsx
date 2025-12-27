@@ -134,7 +134,7 @@ export default function MyBookings() {
 
   return (
     <div className="min-h-screen pt-20 sm:pt-24 pb-12 sm:pb-16 px-3 sm:px-4">
-      <div className="container mx-auto max-w-7xl">
+      <div className="container mx-auto max-w-7xl mt-10">
         
         {/* Header */}
         <motion.div
