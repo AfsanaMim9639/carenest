@@ -46,7 +46,7 @@ export default function Footer() {
           {/* Column 1: Brand & Contact */}
           <div>
             <Link href="/" className="inline-block mb-4">
-              <h3 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+              <h3 className="text-3xl font-bold gradient-text bg-clip-text text-transparent">
                 CareNest
               </h3>
             </Link>
@@ -216,10 +216,11 @@ export default function Footer() {
                   className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/20 text-white placeholder-gray-500 focus:border-purple-400 focus:outline-none transition text-sm"
                 />
                 <button
-                  type="submit"
-                  className="w-full py-2.5 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold text-sm hover:opacity-90 transition-opacity"
+                type="submit"
+                className="w-full py-2.5 rounded-lg text-white font-bold text-sm hover:opacity-90 transition-opacity"
+                style={{ background: 'linear-gradient(to right, #7aabb8, #4d8a9b)' }}
                 >
-                  Subscribe
+                Subscribe
                 </button>
               </form>
             </div>
