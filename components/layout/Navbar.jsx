@@ -74,7 +74,7 @@ export default function Navbar() {
             <div className="hidden md:flex items-center gap-3">
               {!isLoggedIn ? (
                 <>
-                  <Link href="/login">
+                  <Link href="/auth/login">
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
@@ -83,7 +83,7 @@ export default function Navbar() {
                       Login
                     </motion.button>
                   </Link>
-                  <Link href="/register">
+                  <Link href="/auth/register">
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
@@ -217,7 +217,7 @@ export default function Navbar() {
                 <div className="space-y-3 pt-4 border-t border-white/10">
                   {!isLoggedIn ? (
                     <>
-                      <Link href="/login" onClick={() => setIsOpen(false)}>
+                      <Link href="/auth/login" onClick={() => setIsOpen(false)}>
                         <motion.button
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
@@ -226,7 +226,7 @@ export default function Navbar() {
                           Login
                         </motion.button>
                       </Link>
-                      <Link href="/register" onClick={() => setIsOpen(false)}>
+                      <Link href="/auth/register" onClick={() => setIsOpen(false)}>
                         <motion.button
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
