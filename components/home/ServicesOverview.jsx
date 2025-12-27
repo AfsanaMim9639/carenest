@@ -96,7 +96,7 @@ export default function ServicesOverview() {
                     <span className="text-2xl font-bold gradient-text">{service.price}</span>
                   </div>
                   <div className="flex gap-2">
-                    <Link href={`/service/${index + 1}`} className="flex-1">
+                    <Link href="/services" className="flex-1">
                       <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
