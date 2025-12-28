@@ -1,15 +1,31 @@
 import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import dbConnect from '@/lib/db/mongodb';
 import Payment from '@/models/Payment';
 import Booking from '@/models/Booking';
 import { sendInvoiceEmail } from '@/lib/email/emailService';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// Conditionally initialize Stripe
+let stripe;
+try {
+  if (process.env.STRIPE_SECRET_KEY) {
+    const Stripe = require('stripe');
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  }
+} catch (error) {
+  console.error('Stripe initialization error:', error);
+}
+
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 export async function POST(req) {
   try {
+    if (!stripe) {
+      return NextResponse.json(
+        { error: 'Stripe not configured' },
+        { status: 500 }
+      );
+    }
+
     const body = await req.text();
     const signature = req.headers.get('stripe-signature');
 
@@ -73,21 +89,23 @@ async function handlePaymentSuccess(paymentIntent) {
 
   // Update booking status
   const booking = await Booking.findById(payment.booking._id)
-    .populate('service user');
+    .populate('user');
   
-  booking.status = 'confirmed';
-  booking.paymentStatus = 'paid';
-  await booking.save();
+  if (booking) {
+    booking.status = 'confirmed';
+    booking.paymentStatus = 'paid';
+    await booking.save();
 
-  // Send invoice email
-  try {
-    await sendInvoiceEmail({
-      to: booking.user.email,
-      booking: booking,
-      payment: payment
-    });
-  } catch (emailError) {
-    console.error('Failed to send invoice email:', emailError);
+    // Send invoice email
+    try {
+      await sendInvoiceEmail({
+        to: booking.user.email || booking.email,
+        booking: booking,
+        payment: payment
+      });
+    } catch (emailError) {
+      console.error('Failed to send invoice email:', emailError);
+    }
   }
 }
 
@@ -102,7 +120,6 @@ async function handlePaymentFailure(paymentIntent) {
   payment.failureMessage = paymentIntent.last_payment_error?.message;
   await payment.save();
 
-  // Update booking
   await Booking.findByIdAndUpdate(payment.booking, {
     paymentStatus: 'failed'
   });
@@ -120,7 +137,6 @@ async function handleRefund(charge) {
   payment.refundedAt = new Date();
   await payment.save();
 
-  // Update booking
   await Booking.findByIdAndUpdate(payment.booking, {
     paymentStatus: 'refunded',
     status: 'cancelled'

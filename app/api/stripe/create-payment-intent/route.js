@@ -1,14 +1,29 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import Stripe from 'stripe';
 import dbConnect from '@/lib/db/mongodb';
 import Payment from '@/models/Payment';
 import Booking from '@/models/Booking';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// Conditionally initialize Stripe
+let stripe;
+try {
+  if (process.env.STRIPE_SECRET_KEY) {
+    const Stripe = require('stripe');
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  }
+} catch (error) {
+  console.error('Stripe initialization error:', error);
+}
 
 export async function POST(req) {
   try {
+    if (!stripe) {
+      return NextResponse.json(
+        { error: 'Payment service not configured' },
+        { status: 500 }
+      );
+    }
+
     const session = await getServerSession();
     
     if (!session) {
@@ -19,7 +34,6 @@ export async function POST(req) {
 
     const { bookingData } = await req.json();
     
-    // Validate booking data
     if (!bookingData || !bookingData.totalCost) {
       return NextResponse.json(
         { error: 'Invalid booking data' },
@@ -27,13 +41,13 @@ export async function POST(req) {
       );
     }
 
-    // Create booking first (status: pending, payment: pending)
+    // Create booking
     const booking = await Booking.create({
       user: session.user.id,
       serviceId: bookingData.serviceId,
       serviceName: bookingData.serviceName,
       category: bookingData.category,
-      serviceRate: bookingData.totalCost / bookingData.duration, // Calculate rate
+      serviceRate: bookingData.totalCost / bookingData.duration,
       name: bookingData.name,
       phone: bookingData.phone,
       email: bookingData.email,
@@ -53,8 +67,8 @@ export async function POST(req) {
 
     // Create Stripe payment intent
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(bookingData.totalCost * 100), // Convert BDT to cents (or paisa)
-      currency: 'bdt', // Changed to BDT
+      amount: Math.round(bookingData.totalCost * 100),
+      currency: 'bdt',
       automatic_payment_methods: {
         enabled: true,
       },
@@ -84,7 +98,6 @@ export async function POST(req) {
       }
     });
 
-    // Update booking with payment reference
     booking.payment = payment._id;
     await booking.save();
 
