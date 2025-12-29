@@ -1,11 +1,14 @@
 import mongoose from 'mongoose';
 
 const BookingSchema = new mongoose.Schema({
+  // User Information
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: true,
+    index: true
   },
+  
   // Service Information
   serviceId: {
     type: Number,
@@ -17,26 +20,37 @@ const BookingSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    required: true,
-    enum: ['Baby Care', 'Elderly Care', 'Special Care']
+    required: true
+  },
+  serviceIcon: {
+    type: String,
+    default: '🏥'
+  },
+  serviceType: {
+    type: String,
+    enum: ['baby-care', 'elderly-care', 'special-care'],
+    default: 'baby-care'
   },
   serviceRate: {
     type: Number,
     required: true
   },
   
-  // Personal Information
+  // Personal Details
   name: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   phone: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   email: {
     type: String,
-    sparse: true
+    trim: true,
+    lowercase: true
   },
   
   // Duration
@@ -47,7 +61,22 @@ const BookingSchema = new mongoose.Schema({
   },
   duration: {
     type: Number,
-    required: true
+    required: true,
+    min: 1
+  },
+  
+  // Timing (computed from booking)
+  date: {
+    type: Date,
+    default: Date.now
+  },
+  startTime: {
+    type: String,
+    default: 'TBD'
+  },
+  endTime: {
+    type: String,
+    default: 'TBD'
   },
   
   // Location
@@ -72,45 +101,126 @@ const BookingSchema = new mongoose.Schema({
     required: true
   },
   
-  // Additional
-  notes: String,
+  // Computed location string
+  location: {
+    type: String
+  },
   
-  // Booking Details
+  // Additional Information
+  notes: {
+    type: String,
+    default: ''
+  },
+  specialRequirements: {
+    type: String,
+    default: ''
+  },
+  
+  // Pricing
   totalCost: {
     type: Number,
-    required: true
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'],
-    default: 'pending'
-  },
-  paymentStatus: {
-    type: String,
-    enum: ['pending', 'paid', 'failed', 'refunded'],
-    default: 'pending'
-  },
-  payment: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Payment'
+    required: true,
+    min: 0
   },
   
-  // Timestamps
+  // Status
+  status: {
+    type: String,
+    enum: ['pending', 'confirmed', 'completed', 'cancelled'],
+    default: 'pending',
+    index: true
+  },
+  
+  // Booking Date
   bookingDate: {
     type: Date,
     default: Date.now
   },
-  confirmedAt: Date,
-  completedAt: Date,
-  cancelledAt: Date,
-  cancelReason: String
+  
+  // Caregiver Assignment
+  caregiverId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Caregiver',
+    default: null
+  },
+  caregiverName: {
+    type: String,
+    default: 'Pending Assignment'
+  },
+  
+  // Payment Information
+  payment: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Payment',
+    default: null
+  },
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'paid', 'refunded', 'failed'],
+    default: 'pending'
+  },
+  paymentMethod: {
+    type: String,
+    enum: ['card', 'cash', 'mobile banking', 'bank transfer'],
+    default: 'card'
+  },
+  
+  // Cancellation
+  cancellationReason: {
+    type: String,
+    default: null
+  },
+  cancelledAt: {
+    type: Date,
+    default: null
+  }
 }, {
-  timestamps: true
+  timestamps: true,
+  collection: 'bookings'
 });
 
+// Indexes for better query performance
 BookingSchema.index({ user: 1, createdAt: -1 });
-BookingSchema.index({ status: 1 });
-BookingSchema.index({ paymentStatus: 1 });
-BookingSchema.index({ serviceId: 1 });
+BookingSchema.index({ phone: 1 });
+BookingSchema.index({ email: 1 });
+BookingSchema.index({ status: 1, date: 1 });
+BookingSchema.index({ createdAt: -1 });
 
-export default mongoose.models.Booking || mongoose.model('Booking', BookingSchema);
+// Pre-save middleware to set location string
+BookingSchema.pre('save', function(next) {
+  if (this.area && this.city) {
+    this.location = `${this.area}, ${this.city}`;
+  }
+  if (this.notes) {
+    this.specialRequirements = this.notes;
+  }
+  next();
+});
+
+// Virtual for formatted time
+BookingSchema.virtual('time').get(function() {
+  return `${this.startTime} - ${this.endTime}`;
+});
+
+// Virtual for display ID
+BookingSchema.virtual('displayId').get(function() {
+  return `#${this._id.toString().slice(-8).toUpperCase()}`;
+});
+
+// Method to check if booking can be cancelled
+BookingSchema.methods.canBeCancelled = function() {
+  return this.status === 'pending';
+};
+
+// Configure toJSON to include virtuals
+BookingSchema.set('toJSON', { virtuals: true });
+BookingSchema.set('toObject', { virtuals: true });
+
+// Delete existing model to prevent OverwriteModelError
+if (mongoose.models.Booking) {
+  delete mongoose.models.Booking;
+}
+
+const Booking = mongoose.model('Booking', BookingSchema);
+
+export default Booking;

@@ -20,7 +20,8 @@ const UserSchema = new mongoose.Schema({
     required: function() {
       return this.provider === 'credentials';
     },
-    minlength: [6, 'Password must be at least 6 characters']
+    minlength: [6, 'Password must be at least 6 characters'],
+    select: false  // Don't return password by default in queries
   },
   phone: {
     type: String,
@@ -71,29 +72,30 @@ const UserSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Create indexes
+UserSchema.index({ email: 1 });
+UserSchema.index({ phone: 1 });
 
 // Hash password before saving
-UserSchema.pre('save', async function(next) {
+UserSchema.pre('save', async function() {
   if (!this.isModified('password') || !this.password) {
-    return next();
+    return;
   }
   
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
-    next();
   } catch (error) {
-    next(error);
+    throw new Error(`Password hashing failed: ${error.message}`);
   }
 });
 
 // Compare password method
 UserSchema.methods.comparePassword = async function(candidatePassword) {
-  try {
-    return await bcrypt.compare(candidatePassword, this.password);
-  } catch (error) {
-    throw error;
+  if (!candidatePassword || !this.password) {
+    return false;
   }
+  return await bcrypt.compare(candidatePassword, this.password);
 };
 
 // Don't return password in JSON
@@ -103,4 +105,7 @@ UserSchema.methods.toJSON = function() {
   return user;
 };
 
-export default mongoose.models.User || mongoose.model('User', UserSchema);
+// Delete existing model to prevent OverwriteModelError
+delete mongoose.models.User;
+
+export default mongoose.model('User', UserSchema);

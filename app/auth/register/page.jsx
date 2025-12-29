@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
+import toast from "react-hot-toast";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -95,26 +97,86 @@ export default function RegisterPage() {
     e.preventDefault();
 
     if (!validateForm()) {
+      toast.error("Please fix the form errors", {
+        duration: 3000,
+      });
       return;
     }
 
     setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      console.log("Registration data:", formData);
-      
-      // এখানে আপনার actual registration API call হবে
-      // const response = await fetch('/api/auth/register', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(formData)
-      // });
+    try {
+      // Register the user
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nid: formData.nid,
+          name: formData.name,
+          email: formData.email,
+          contact: formData.contact,
+          password: formData.password
+        })
+      });
 
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || "Registration failed", {
+          duration: 4000,
+        });
+        setErrors({ general: data.error });
+        setIsLoading(false);
+        return;
+      }
+
+      // Show success message
+      toast.success("Account created successfully! Signing you in...", {
+        duration: 3000,
+        icon: "🎉",
+      });
+
+      // Auto login after registration
+      const signInResult = await signIn("credentials", {
+        email: formData.email,
+        password: formData.password,
+        redirect: false
+      });
+
+      // After successful auto-login
+if (signInResult?.ok) {
+  toast.success("Welcome to CareNest! Redirecting...", {
+    duration: 2000,
+    icon: "✨",
+  });
+  
+  // Check if there's a callback URL in the query params
+  const searchParams = new URLSearchParams(window.location.search);
+  const callbackUrl = searchParams.get('callbackUrl') || '/services';
+  
+  
+  setTimeout(() => {
+    router.push(callbackUrl);
+    router.refresh();
+  }, 1000);
+} else {
+        // Registration success but login failed
+        toast.error("Registration successful! Please login manually.", {
+          duration: 4000,
+        });
+        setTimeout(() => {
+          router.push("/login?registered=true");
+        }, 1500);
+      }
+
+    } catch (error) {
+      console.error("Registration error:", error);
+      toast.error("Something went wrong. Please try again.", {
+        duration: 4000,
+      });
+      setErrors({ general: "Registration failed. Please try again." });
       setIsLoading(false);
-      // Success - redirect to booking page
-      router.push("/services");
-    }, 2000);
+    }
   };
 
   return (
@@ -141,6 +203,13 @@ export default function RegisterPage() {
           className="glass-card p-8"
         >
           <form onSubmit={handleSubmit} className="space-y-6">
+            
+            {/* General Error Message */}
+            {errors.general && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                <p className="text-red-400 text-sm">{errors.general}</p>
+              </div>
+            )}
             
             <div className="grid md:grid-cols-2 gap-6">
               {/* NID Number */}
@@ -359,13 +428,13 @@ export default function RegisterPage() {
 
             {/* Submit Button */}
             <motion.button
-                type="submit"
-                disabled={isLoading}
-                whileHover={{ scale: isLoading ? 1 : 1.02 }}
-                whileTap={{ scale: isLoading ? 1 : 0.98 }}
-                className="w-full py-3 rounded-lg text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-                style={{ background: 'linear-gradient(to right, #7aabb8, #4d8a9b)' }}
-                >
+              type="submit"
+              disabled={isLoading}
+              whileHover={{ scale: isLoading ? 1 : 1.02 }}
+              whileTap={{ scale: isLoading ? 1 : 0.98 }}
+              className="w-full py-3 rounded-lg text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              style={{ background: 'linear-gradient(to right, #7aabb8, #4d8a9b)' }}
+            >
               {isLoading ? (
                 <>
                   <motion.div

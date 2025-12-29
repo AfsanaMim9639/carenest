@@ -4,50 +4,96 @@ const PaymentSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: true,
+    index: true
   },
   booking: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Booking',
-    required: true
+    required: true,
+    index: true
   },
   amount: {
     type: Number,
-    required: true
+    required: true,
+    min: 0
   },
   currency: {
     type: String,
-    default: 'usd'
+    default: 'bdt',
+    uppercase: true
   },
   status: {
     type: String,
-    enum: ['pending', 'processing', 'succeeded', 'failed', 'refunded'],
-    default: 'pending'
+    enum: ['pending', 'completed', 'failed', 'cancelled', 'refunded'],
+    default: 'pending',
+    index: true
   },
   paymentMethod: {
     type: String,
-    required: true
+    enum: ['card', 'cash', 'mobile banking', 'bank transfer'],
+    default: 'card'
   },
   stripePaymentIntentId: {
     type: String,
-    required: true,
-    unique: true
+    unique: true,
+    sparse: true,
+    index: true
   },
-  stripeCustomerId: String,
+  stripeChargeId: {
+    type: String,
+    sparse: true
+  },
+  paidAt: {
+    type: Date,
+    default: null
+  },
+  refundedAt: {
+    type: Date,
+    default: null
+  },
+  refundAmount: {
+    type: Number,
+    default: 0
+  },
   metadata: {
-    type: Map,
-    of: String
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
   },
-  receiptUrl: String,
-  refundId: String,
-  refundedAt: Date,
-  failureMessage: String
+  failureReason: {
+    type: String,
+    default: null
+  }
 }, {
-  timestamps: true
+  timestamps: true,
+  collection: 'payments'
 });
 
+// Indexes for better query performance
 PaymentSchema.index({ user: 1, createdAt: -1 });
-PaymentSchema.index({ status: 1 });
+PaymentSchema.index({ booking: 1 });
+PaymentSchema.index({ status: 1, createdAt: -1 });
 PaymentSchema.index({ stripePaymentIntentId: 1 });
 
-export default mongoose.models.Payment || mongoose.model('Payment', PaymentSchema);
+// Virtual for display amount
+PaymentSchema.virtual('displayAmount').get(function() {
+  return `৳${this.amount.toLocaleString()}`;
+});
+
+// Method to check if payment can be refunded
+PaymentSchema.methods.canBeRefunded = function() {
+  return this.status === 'completed' && !this.refundedAt;
+};
+
+// Configure toJSON to include virtuals
+PaymentSchema.set('toJSON', { virtuals: true });
+PaymentSchema.set('toObject', { virtuals: true });
+
+// Delete existing model to prevent OverwriteModelError
+if (mongoose.models.Payment) {
+  delete mongoose.models.Payment;
+}
+
+const Payment = mongoose.model('Payment', PaymentSchema);
+
+export default Payment;

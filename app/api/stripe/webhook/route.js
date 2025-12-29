@@ -1,59 +1,110 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-
 import dbConnect from "@/lib/db/mongodb";
-import Payment from "@/models/Payment";
 import Booking from "@/models/Booking";
-import { sendInvoiceEmail } from "@/lib/email/emailService";
+import Payment from "@/models/Payment";
 
-export const runtime = "nodejs";
-
-function getStripe() {
-  if (!process.env.STRIPE_SECRET_KEY) {
-    throw new Error("Stripe secret key missing");
-  }
-  return new Stripe(process.env.STRIPE_SECRET_KEY);
-}
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 export async function POST(req) {
   try {
-    if (!process.env.STRIPE_WEBHOOK_SECRET) {
-      throw new Error("Stripe webhook secret missing");
-    }
-
-    const stripe = getStripe();
-
     const body = await req.text();
     const signature = req.headers.get("stripe-signature");
 
+    if (!webhookSecret) {
+      console.error("Stripe webhook secret not configured");
+      return NextResponse.json(
+        { error: "Webhook secret not configured" },
+        { status: 500 }
+      );
+    }
+
     let event;
+
     try {
       event = stripe.webhooks.constructEvent(
         body,
         signature,
-        process.env.STRIPE_WEBHOOK_SECRET
+        webhookSecret
       );
     } catch (err) {
       console.error("Webhook signature verification failed:", err.message);
       return NextResponse.json(
-        { error: "Invalid signature" },
+        { error: `Webhook Error: ${err.message}` },
         { status: 400 }
       );
     }
 
     await dbConnect();
 
+    // Handle the event
     switch (event.type) {
       case "payment_intent.succeeded":
-        await handlePaymentSuccess(event.data.object);
+        const paymentIntent = event.data.object;
+        
+        console.log("Payment succeeded:", paymentIntent.id);
+        console.log("Metadata:", paymentIntent.metadata);
+
+        // Update payment record
+        const payment = await Payment.findOneAndUpdate(
+          { stripePaymentIntentId: paymentIntent.id },
+          {
+            status: "completed",
+            paidAt: new Date(),
+            stripePaymentIntentId: paymentIntent.id,
+          },
+          { new: true }
+        );
+
+        if (payment) {
+          // Update booking
+          await Booking.findByIdAndUpdate(payment.booking, {
+            paymentStatus: "paid",
+            status: "confirmed" // Automatically confirm on payment
+          });
+
+          console.log("Booking and payment updated successfully");
+        } else {
+          console.error("Payment record not found for:", paymentIntent.id);
+        }
+
         break;
 
       case "payment_intent.payment_failed":
-        await handlePaymentFailure(event.data.object);
+        const failedPayment = event.data.object;
+        
+        console.log("Payment failed:", failedPayment.id);
+
+        // Update payment record
+        await Payment.findOneAndUpdate(
+          { stripePaymentIntentId: failedPayment.id },
+          { status: "failed" }
+        );
+
+        // Update booking
+        const failedBooking = await Payment.findOne({
+          stripePaymentIntentId: failedPayment.id
+        });
+
+        if (failedBooking) {
+          await Booking.findByIdAndUpdate(failedBooking.booking, {
+            paymentStatus: "failed"
+          });
+        }
+
         break;
 
-      case "charge.refunded":
-        await handleRefund(event.data.object);
+      case "payment_intent.canceled":
+        const canceledPayment = event.data.object;
+        
+        console.log("Payment canceled:", canceledPayment.id);
+
+        await Payment.findOneAndUpdate(
+          { stripePaymentIntentId: canceledPayment.id },
+          { status: "cancelled" }
+        );
+
         break;
 
       default:
@@ -61,6 +112,7 @@ export async function POST(req) {
     }
 
     return NextResponse.json({ received: true });
+
   } catch (error) {
     console.error("Webhook error:", error);
     return NextResponse.json(
@@ -70,71 +122,9 @@ export async function POST(req) {
   }
 }
 
-async function handlePaymentSuccess(paymentIntent) {
-  const payment = await Payment.findOne({
-    stripePaymentIntentId: paymentIntent.id,
-  }).populate("booking user");
-
-  if (!payment || payment.status === "succeeded") return;
-
-  payment.status = "succeeded";
-  payment.receiptUrl =
-    paymentIntent.charges?.data?.[0]?.receipt_url;
-
-  await payment.save();
-
-  const booking = await Booking.findById(payment.booking._id).populate("user");
-
-  if (!booking) return;
-
-  booking.status = "confirmed";
-  booking.paymentStatus = "paid";
-  await booking.save();
-
-  try {
-    await sendInvoiceEmail({
-      to: booking.user?.email || booking.email,
-      booking,
-      payment,
-    });
-  } catch (err) {
-    console.error("Invoice email failed:", err);
-  }
-}
-
-async function handlePaymentFailure(paymentIntent) {
-  const payment = await Payment.findOne({
-    stripePaymentIntentId: paymentIntent.id,
-  });
-
-  if (!payment || payment.status === "failed") return;
-
-  payment.status = "failed";
-  payment.failureMessage =
-    paymentIntent.last_payment_error?.message;
-
-  await payment.save();
-
-  await Booking.findByIdAndUpdate(payment.booking, {
-    paymentStatus: "failed",
-  });
-}
-
-async function handleRefund(charge) {
-  const payment = await Payment.findOne({
-    stripePaymentIntentId: charge.payment_intent,
-  });
-
-  if (!payment || payment.status === "refunded") return;
-
-  payment.status = "refunded";
-  payment.refundId = charge.refunds?.data?.[0]?.id;
-  payment.refundedAt = new Date();
-
-  await payment.save();
-
-  await Booking.findByIdAndUpdate(payment.booking, {
-    paymentStatus: "refunded",
-    status: "cancelled",
-  });
-}
+// Disable body parsing for webhooks
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};

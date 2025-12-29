@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import toast from "react-hot-toast";
 import { 
   ArrowLeft, Calendar, Clock, MapPin, 
   Phone, Mail, User, FileText, CheckCircle,
@@ -71,14 +72,39 @@ export default function BookingPage() {
       const rate = service.rate;
       
       if (formData.durationType === "days") {
-        // For days, calculate as rate per day
-        setTotalCost(rate * duration);
+        // For services billed per day (like 24/7 Live-in Care)
+        if (service.unit === "day") {
+          setTotalCost(rate * duration);
+        } else {
+          // For hourly services converted to days (24 hours per day)
+          setTotalCost(rate * duration * 24);
+        }
       } else {
         // For hours
         setTotalCost(rate * duration);
       }
     }
   }, [formData.duration, formData.durationType, service]);
+
+
+  // Restore pending booking data after login
+useEffect(() => {
+  const pendingBooking = localStorage.getItem('pendingBooking');
+  if (pendingBooking) {
+    try {
+      const data = JSON.parse(pendingBooking);
+      if (data.serviceId === serviceId) {
+        setFormData(data.formData);
+        setTotalCost(data.totalCost);
+        toast.info("Your booking details have been restored", {
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      console.error("Error restoring booking:", error);
+    }
+  }
+}, [serviceId]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -90,36 +116,80 @@ export default function BookingPage() {
     }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  // Check if user is logged in BEFORE submitting
+  try {
+    const sessionResponse = await fetch('/api/auth/session');
+    const sessionData = await sessionResponse.json();
+    
+    if (!sessionData?.user) {
+      toast.error("Please login to complete your booking", {
+        duration: 4000,
+        icon: "🔒",
+      });
+      // Save form data to localStorage before redirecting
+      localStorage.setItem('pendingBooking', JSON.stringify({
+        serviceId,
+        serviceName: service.name,
+        category: service.category,
+        formData,
+        totalCost
+      }));
+      router.push(`/login?callbackUrl=/booking/${serviceId}`);
+      return;
+    }
+  } catch (error) {
+    console.error("Session check error:", error);
+  }
 
-    // Prepare booking data
-    const bookingData = {
-      serviceId,
-      serviceName: service.name,
-      category: service.category,
-      ...formData,
-      totalCost,
-      status: "Pending",
-      bookingDate: new Date().toISOString(),
-    };
+  setIsSubmitting(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      console.log("Booking Data:", bookingData);
-      
-      // Here you would make actual API call:
-      // const response = await fetch('/api/bookings', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(bookingData)
-      // });
-
-      setIsSubmitting(false);
-      setIsSubmitted(true);
-    }, 2000);
+  // Prepare booking data
+  const bookingData = {
+    serviceId,
+    serviceName: service.name,
+    category: service.category,
+    ...formData,
+    totalCost,
+    status: "pending",
+    bookingDate: new Date().toISOString(),
   };
+
+  try {
+    // Actual API call to save booking
+    const response = await fetch('/api/bookings', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(bookingData)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to create booking');
+    }
+
+    // Success - clear any pending booking data
+    localStorage.removeItem('pendingBooking');
+    
+    setIsSubmitted(true);
+    toast.success("Booking created successfully!", {
+      duration: 3000,
+    });
+
+  } catch (error) {
+    console.error("Booking error:", error);
+    toast.error(error.message || "Failed to create booking", {
+      duration: 4000,
+    });
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   if (!service) {
     return (
@@ -309,7 +379,7 @@ export default function BookingPage() {
                       value={formData.durationType}
                       onChange={handleChange}
                       disabled={service.unit === "day"}
-                      className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white focus:border-theme-100 focus:outline-none transition disabled:opacity-50"
+                      className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white focus:border-theme-100 focus:outline-none transition disabled:opacity-50 [&>option]:bg-gray-900 [&>option]:text-white"
                     >
                       <option value="hours">Hours</option>
                       <option value="days">Days</option>
@@ -350,7 +420,7 @@ export default function BookingPage() {
                       required
                       value={formData.division}
                       onChange={handleChange}
-                      className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white focus:border-theme-100 focus:outline-none transition"
+                      className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white focus:border-theme-100 focus:outline-none transition [&>option]:bg-gray-900 [&>option]:text-white"
                     >
                       <option value="">Select Division</option>
                       {Object.keys(locations).map(div => (
@@ -369,7 +439,7 @@ export default function BookingPage() {
                       value={formData.district}
                       onChange={handleChange}
                       disabled={!formData.division}
-                      className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white focus:border-theme-100 focus:outline-none transition disabled:opacity-50"
+                      className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white focus:border-theme-100 focus:outline-none transition disabled:opacity-50 [&>option]:bg-gray-900 [&>option]:text-white"
                     >
                       <option value="">Select District</option>
                       {formData.division && locations[formData.division]?.map(dist => (

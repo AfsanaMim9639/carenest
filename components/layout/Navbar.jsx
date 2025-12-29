@@ -3,23 +3,29 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, User, LogOut, Home, Briefcase, BookOpen, Phone } from "lucide-react";
 import Link from "next/link";
+import { useSession, signOut } from "next-auth/react";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false); // Change based on auth state
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  
+  // Use NextAuth session
+  const { data: session, status } = useSession();
+  const isLoggedIn = status === "authenticated";
 
-  const navLinks = [
-    { name: "Home", href: "/", icon: Home },
-    { name: "Services", href: "/services", icon: Briefcase },
-    { name: "My Bookings", href: "/my-bookings", icon: BookOpen },
-    { name: "Contact", href: "/contact", icon: Phone },
+  const allNavLinks = [
+    { name: "Home", href: "/", icon: Home, requireAuth: false },
+    { name: "Services", href: "/services", icon: Briefcase, requireAuth: false },
+    { name: "My Bookings", href: "/my-bookings", icon: BookOpen, requireAuth: true },
+    { name: "Contact", href: "/contact", icon: Phone, requireAuth: false },
   ];
 
-  const handleLogout = () => {
-    setIsLoggedIn(false);
+  // Filter links based on login status
+  const navLinks = allNavLinks.filter(link => !link.requireAuth || isLoggedIn);
+
+  const handleLogout = async () => {
     setShowProfileMenu(false);
-    // Add logout logic here
+    await signOut({ callbackUrl: "/" });
   };
 
   return (
@@ -104,7 +110,7 @@ export default function Navbar() {
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-theme-50 to-theme-200 flex items-center justify-center">
                       <User className="w-5 h-5 text-theme-900" />
                     </div>
-                    <span className="text-white font-medium">John Doe</span>
+                    <span className="text-white font-medium">{session?.user?.name || "User"}</span>
                   </motion.button>
 
                   {/* Profile Dropdown */}
@@ -120,6 +126,7 @@ export default function Navbar() {
                         <Link
                           href="/profile"
                           className="flex items-center gap-3 px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 transition-all"
+                          onClick={() => setShowProfileMenu(false)}
                         >
                           <User className="w-4 h-4" />
                           <span>Profile</span>
@@ -172,7 +179,7 @@ export default function Navbar() {
               className="fixed top-0 right-0 bottom-0 w-80 glass-strong md:hidden overflow-y-auto"
               style={{ zIndex: 45 }}
             >
-              <div className="p-6 pt-24">{/* pt-24 added to leave space for navbar */}
+              <div className="p-6 pt-24">
                 {/* Logo */}
                 <div className="flex items-center gap-3 mb-8">
                   <div className="w-12 h-12 bg-gradient-to-br from-theme-50 to-theme-200 rounded-xl flex items-center justify-center">

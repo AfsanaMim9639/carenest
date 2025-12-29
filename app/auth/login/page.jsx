@@ -1,15 +1,18 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Mail, Lock, Eye, EyeOff, LogIn, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
+import toast from "react-hot-toast";
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: session, status } = useSession();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const registered = searchParams.get("registered");
   
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -17,20 +20,50 @@ export default function LoginPage() {
     email: "",
     password: ""
   });
-  const [error, setError] = useState("");
+
+  const hasShownToast = useRef(false);
+  const hasShownRegisterToast = useRef(false);
+  
+  // Check if user is already logged in (only once)
+  useEffect(() => {
+    if (status === "authenticated" && !hasShownToast.current) {
+      hasShownToast.current = true;
+      toast.success("You're already logged in!", {
+        duration: 2000,
+      });
+      router.push(callbackUrl);
+    }
+  }, [status, router, callbackUrl]);
+
+  // Show registration success message (only once)
+  useEffect(() => {
+    if (registered === "true" && !hasShownRegisterToast.current) {
+      hasShownRegisterToast.current = true;
+      toast.success("Registration successful! Please login.", {
+        duration: 4000,
+        icon: "🎉",
+      });
+    }
+  }, [registered]);
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
     });
-    setError("");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!formData.email || !formData.password) {
+      toast.error("Please fill in all fields", {
+        duration: 3000,
+      });
+      return;
+    }
+
     setIsLoading(true);
-    setError("");
 
     try {
       const result = await signIn("credentials", {
@@ -40,15 +73,46 @@ export default function LoginPage() {
       });
 
       if (result?.error) {
-        setError(result.error);
+        // Handle specific error messages
+        if (result.error.includes("No user found")) {
+          toast.error("No account found with this email", {
+            duration: 4000,
+          });
+        } else if (result.error.includes("Invalid password")) {
+          toast.error("Incorrect password. Please try again.", {
+            duration: 4000,
+          });
+        } else if (result.error.includes("deactivated")) {
+          toast.error("Your account has been deactivated", {
+            duration: 4000,
+          });
+        } else if (result.error.includes("Google")) {
+          toast.error("Please sign in with Google", {
+            duration: 4000,
+          });
+        } else {
+          toast.error(result.error || "Login failed", {
+            duration: 4000,
+          });
+        }
         setIsLoading(false);
       } else {
-        // Success - redirect
-        router.push(callbackUrl);
-        router.refresh();
+        // Success
+        toast.success("Login successful! Welcome back 👋", {
+          duration: 2000,
+          icon: "✨",
+        });
+        
+        setTimeout(() => {
+          router.push(callbackUrl);
+          router.refresh();
+        }, 500);
       }
     } catch (err) {
-      setError("An error occurred. Please try again.");
+      console.error("Login error:", err);
+      toast.error("Something went wrong. Please try again.", {
+        duration: 4000,
+      });
       setIsLoading(false);
     }
   };
@@ -58,10 +122,30 @@ export default function LoginPage() {
     try {
       await signIn("google", { callbackUrl });
     } catch (err) {
-      setError("Failed to sign in with Google");
+      toast.error("Failed to sign in with Google", {
+        duration: 4000,
+      });
       setIsLoading(false);
     }
   };
+
+  // Show loading while checking session
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-12 h-12 border-4 border-purple-400 border-t-transparent rounded-full"
+        />
+      </div>
+    );
+  }
+
+  // Don't render login form if already authenticated
+  if (status === "authenticated") {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-20">
@@ -87,17 +171,6 @@ export default function LoginPage() {
           className="glass-card p-8"
         >
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Error Message */}
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-red-500/10 border border-red-500/50 rounded-lg p-3 text-red-400 text-sm"
-              >
-                {error}
-              </motion.div>
-            )}
-
             {/* Email Field */}
             <div>
               <label className="block text-white/70 text-sm font-medium mb-2">

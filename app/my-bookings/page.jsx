@@ -1,78 +1,87 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Calendar, MapPin, Clock, DollarSign, 
   CheckCircle, XCircle, AlertCircle, Loader,
   Filter, Search, Eye, Trash2, MoreVertical, AlertTriangle
 } from "lucide-react";
+import toast from "react-hot-toast";
 
 export default function MyBookings() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  
   const [filter, setFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
-  const [showToast, setShowToast] = useState(false);
-  const [bookingsList, setBookingsList] = useState([
-    {
-      id: 1,
-      serviceName: "Baby Care",
-      serviceIcon: "👶",
-      duration: "4 hours",
-      date: "2024-01-15",
-      time: "10:00 AM - 2:00 PM",
-      location: "Gulshan-2, Dhaka",
-      totalCost: 2000,
-      status: "confirmed",
-      caregiverName: "Sara Rahman",
-      bookedOn: "2024-01-10"
-    },
-    {
-      id: 2,
-      serviceName: "Elderly Care",
-      serviceIcon: "👴",
-      duration: "8 hours",
-      date: "2024-01-20",
-      time: "9:00 AM - 5:00 PM",
-      location: "Banani, Dhaka",
-      totalCost: 4800,
-      status: "pending",
-      caregiverName: "Pending Assignment",
-      bookedOn: "2024-01-12"
-    },
-    {
-      id: 3,
-      serviceName: "Special Care",
-      serviceIcon: "🏥",
-      duration: "6 hours",
-      date: "2024-01-05",
-      time: "2:00 PM - 8:00 PM",
-      location: "Dhanmondi, Dhaka",
-      totalCost: 4800,
-      status: "completed",
-      caregiverName: "Dr. Kamal Hossain",
-      bookedOn: "2024-01-01"
-    },
-    {
-      id: 4,
-      serviceName: "Baby Care",
-      serviceIcon: "👶",
-      duration: "3 hours",
-      date: "2024-01-08",
-      time: "3:00 PM - 6:00 PM",
-      location: "Uttara, Dhaka",
-      totalCost: 1500,
-      status: "cancelled",
-      caregiverName: "N/A",
-      bookedOn: "2024-01-05"
-    }
-  ]);
+  const [bookingsList, setBookingsList] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleDeleteBooking = (bookingId) => {
-    setBookingsList(bookingsList.filter(b => b.id !== bookingId));
-    setShowDeleteConfirm(null);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
+  // Fetch bookings on component mount
+  useEffect(() => {
+    if (status === "authenticated") {
+      fetchBookings();
+    } else if (status === "unauthenticated") {
+      router.push("/login?callbackUrl=/my-bookings");
+    }
+  }, [status]);
+
+  const fetchBookings = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/bookings/user');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch bookings');
+      }
+
+      const data = await response.json();
+      setBookingsList(data.bookings || []);
+    } catch (error) {
+      console.error("Fetch bookings error:", error);
+      toast.error("Failed to load bookings", {
+        duration: 3000,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteBooking = async (booking) => {
+    setIsDeleting(true);
+    
+    try {
+      const response = await fetch(`/api/bookings/${booking.id}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to cancel booking');
+      }
+
+      // Remove from local state
+      setBookingsList(bookingsList.filter(b => b.id !== booking.id));
+      setShowDeleteConfirm(null);
+      
+      toast.success("Booking cancelled successfully!", {
+        duration: 3000,
+        icon: "✅",
+      });
+    } catch (error) {
+      console.error("Cancel booking error:", error);
+      toast.error(error.message || "Failed to cancel booking", {
+        duration: 4000,
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const statusConfig = {
@@ -131,6 +140,22 @@ export default function MyBookings() {
       </div>
     );
   };
+
+  // Loading state
+  if (status === "loading" || isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center pt-20">
+        <div className="text-center">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            className="w-12 h-12 sm:w-16 sm:h-16 border-4 border-[#7aabb8] border-t-transparent rounded-full mx-auto mb-4"
+          />
+          <p className="text-white/70 text-sm sm:text-base">Loading your bookings...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pt-20 sm:pt-24 pb-12 sm:pb-16 px-3 sm:px-4">
@@ -326,7 +351,7 @@ export default function MyBookings() {
                   whileTap={{ scale: 0.95 }}
                   className="px-6 py-2.5 sm:py-3 rounded-lg text-sm sm:text-base text-white font-semibold"
                   style={{ background: 'linear-gradient(to right, #7aabb8, #4d8a9b)' }}
-                  onClick={() => window.location.href = '/services'}
+                  onClick={() => router.push('/services')}
                 >
                   Browse Services
                 </motion.button>
@@ -334,6 +359,76 @@ export default function MyBookings() {
             )}
           </AnimatePresence>
         </div>
+
+        {/* Delete Confirmation Modal */}
+        <AnimatePresence>
+          {showDeleteConfirm && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => !isDeleting && setShowDeleteConfirm(null)}
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+              />
+              
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="fixed inset-0 z-50 flex items-center justify-center p-4"
+              >
+                <div className="backdrop-blur-xl bg-slate-900/95 border border-white/10 rounded-2xl p-6 w-full max-w-md">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+                      <AlertTriangle className="w-6 h-6 text-red-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white">Cancel Booking?</h3>
+                      <p className="text-sm text-white/60">This action cannot be undone</p>
+                    </div>
+                  </div>
+
+                  <p className="text-white/70 text-sm mb-6">
+                    Are you sure you want to cancel your booking for <span className="font-semibold text-white">{showDeleteConfirm.serviceName}</span>?
+                  </p>
+
+                  <div className="flex gap-3">
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setShowDeleteConfirm(null)}
+                      disabled={isDeleting}
+                      className="flex-1 py-2.5 rounded-lg text-white font-semibold bg-white/10 hover:bg-white/20 transition-all disabled:opacity-50"
+                    >
+                      Keep Booking
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleDeleteBooking(showDeleteConfirm)}
+                      disabled={isDeleting}
+                      className="flex-1 py-2.5 rounded-lg text-white font-semibold bg-red-500 hover:bg-red-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {isDeleting ? (
+                        <>
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                          />
+                          Cancelling...
+                        </>
+                      ) : (
+                        "Cancel Booking"
+                      )}
+                    </motion.button>
+                  </div>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
 
         {/* Booking Details Modal */}
         <AnimatePresence>
@@ -381,7 +476,7 @@ export default function MyBookings() {
                     <div className="grid gap-2 sm:gap-3">
                       <div className="flex justify-between py-2 text-sm sm:text-base">
                         <span className="text-white/60">Booking ID</span>
-                        <span className="text-white font-medium">#{selectedBooking.id}</span>
+                        <span className="text-white font-medium">#{selectedBooking.id.slice(-8)}</span>
                       </div>
                       <div className="flex justify-between py-2 text-sm sm:text-base">
                         <span className="text-white/60">Date</span>
@@ -424,6 +519,10 @@ export default function MyBookings() {
                         <motion.button
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
+                          onClick={() => {
+                            setSelectedBooking(null);
+                            setShowDeleteConfirm(selectedBooking);
+                          }}
                           className="flex-1 py-2.5 sm:py-3 rounded-lg text-sm sm:text-base text-white font-semibold bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-all"
                         >
                           Cancel Booking
