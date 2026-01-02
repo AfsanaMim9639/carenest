@@ -4,10 +4,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, User, LogOut, Home, Briefcase, BookOpen, Phone } from "lucide-react";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  
+  const router = useRouter();
   
   // Use NextAuth session
   const { data: session, status } = useSession();
@@ -25,7 +28,21 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     setShowProfileMenu(false);
-    await signOut({ callbackUrl: "/" });
+    setIsOpen(false);
+    
+    try {
+      await signOut({ 
+        callbackUrl: "/",
+        redirect: false
+      });
+      
+      // Manual redirect
+      router.push("/");
+      router.refresh();
+      
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
   return (
@@ -237,6 +254,12 @@ export default function Navbar() {
                     </>
                   ) : (
                     <>
+                      <div className="px-4 py-2 rounded-lg bg-white/5">
+                        <p className="text-xs text-white/60 mb-1">Signed in as</p>
+                        <p className="text-white font-medium">{session?.user?.name || "User"}</p>
+                        <p className="text-xs text-white/60">{session?.user?.email}</p>
+                      </div>
+                      
                       <Link href="/profile" onClick={() => setIsOpen(false)}>
                         <motion.button
                           whileHover={{ scale: 1.02 }}
@@ -247,14 +270,12 @@ export default function Navbar() {
                           <span>Profile</span>
                         </motion.button>
                       </Link>
+                      
                       <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() => {
-                          handleLogout();
-                          setIsOpen(false);
-                        }}
-                        className="w-full flex items-center justify-center gap-2 glass-button"
+                        onClick={handleLogout}
+                        className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-lg text-white bg-red-500/20 hover:bg-red-500/30 transition-all font-medium border border-red-500/30"
                       >
                         <LogOut className="w-5 h-5" />
                         <span>Logout</span>

@@ -186,15 +186,14 @@ BookingSchema.index({ email: 1 });
 BookingSchema.index({ status: 1, date: 1 });
 BookingSchema.index({ createdAt: -1 });
 
-// Pre-save middleware to set location string
-BookingSchema.pre('save', function(next) {
+// ✅ FIXED: Pre-save middleware - ASYNC VERSION (no next parameter needed)
+BookingSchema.pre('save', async function() {
   if (this.area && this.city) {
     this.location = `${this.area}, ${this.city}`;
   }
   if (this.notes) {
     this.specialRequirements = this.notes;
   }
-  next();
 });
 
 // Virtual for formatted time
@@ -216,9 +215,10 @@ BookingSchema.methods.canBeCancelled = function() {
 BookingSchema.set('toJSON', { virtuals: true });
 BookingSchema.set('toObject', { virtuals: true });
 
-// Delete existing model to prevent OverwriteModelError
-if (mongoose.models.Booking) {
-  delete mongoose.models.Booking;
+// ✅ FIXED: Force clear model cache
+delete mongoose.models.Booking;
+if (mongoose.connection.models && mongoose.connection.models.Booking) {
+  delete mongoose.connection.models.Booking;
 }
 
 const Booking = mongoose.model('Booking', BookingSchema);
