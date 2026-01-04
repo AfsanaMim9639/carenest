@@ -32,10 +32,9 @@ export async function GET(req) {
 
     console.log('Query:', query);
 
-    // Fetch bookings
+    // Fetch bookings - REMOVED .populate() to fix the error
     const bookings = await Booking.find(query)
       .sort({ createdAt: -1 })
-      .populate('payment', 'amount status')
       .lean();
 
     console.log('Found bookings:', bookings.length);

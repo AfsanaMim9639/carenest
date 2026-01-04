@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, User, LogOut, Home, Briefcase, BookOpen, Phone } from "lucide-react";
+import { Menu, X, User, LogOut, Home, Briefcase, BookOpen, Phone, Shield } from "lucide-react";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -15,33 +15,42 @@ export default function Navbar() {
   // Use NextAuth session
   const { data: session, status } = useSession();
   const isLoggedIn = status === "authenticated";
+  const isAdmin = session?.user?.role === "admin";
 
   const allNavLinks = [
     { name: "Home", href: "/", icon: Home, requireAuth: false },
     { name: "Services", href: "/services", icon: Briefcase, requireAuth: false },
     { name: "My Bookings", href: "/my-bookings", icon: BookOpen, requireAuth: true },
+    { name: "Admin", href: "/admin", icon: Shield, requireAuth: true, adminOnly: true },
     { name: "Contact", href: "/contact", icon: Phone, requireAuth: false },
   ];
 
-  // Filter links based on login status
-  const navLinks = allNavLinks.filter(link => !link.requireAuth || isLoggedIn);
+  // Filter links based on login status and admin role
+  const navLinks = allNavLinks.filter(link => {
+    if (link.adminOnly) {
+      return isAdmin;
+    }
+    return !link.requireAuth || isLoggedIn;
+  });
 
+  // ✅ FIXED: Better logout handler
   const handleLogout = async () => {
     setShowProfileMenu(false);
     setIsOpen(false);
     
     try {
+      // Use NextAuth's signOut with redirect false
       await signOut({ 
-        callbackUrl: "/",
         redirect: false
       });
       
-      // Manual redirect
-      router.push("/");
-      router.refresh();
+      // Manual navigation to home
+      window.location.href = "/";
       
     } catch (error) {
       console.error("Logout error:", error);
+      // Fallback: force reload home page
+      window.location.href = "/";
     }
   };
 
@@ -84,10 +93,19 @@ export default function Navbar() {
                 >
                   <Link
                     href={link.href}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-all duration-300 group"
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 group ${
+                      link.adminOnly 
+                        ? 'text-amber-400/80 hover:text-amber-400 hover:bg-amber-400/10' 
+                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                    }`}
                   >
                     <link.icon className="w-4 h-4 group-hover:scale-110 transition-transform" />
                     <span className="font-medium">{link.name}</span>
+                    {link.adminOnly && (
+                      <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-400/20 text-amber-400">
+                        ADMIN
+                      </span>
+                    )}
                   </Link>
                 </motion.div>
               ))}
@@ -124,10 +142,23 @@ export default function Navbar() {
                     onClick={() => setShowProfileMenu(!showProfileMenu)}
                     className="flex items-center gap-2 glass-card px-4 py-2"
                   >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-theme-50 to-theme-200 flex items-center justify-center">
-                      <User className="w-5 h-5 text-theme-900" />
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      isAdmin 
+                        ? 'bg-gradient-to-br from-amber-400 to-amber-600' 
+                        : 'bg-gradient-to-br from-theme-50 to-theme-200'
+                    }`}>
+                      {isAdmin ? (
+                        <Shield className="w-5 h-5 text-white" />
+                      ) : (
+                        <User className="w-5 h-5 text-theme-900" />
+                      )}
                     </div>
-                    <span className="text-white font-medium">{session?.user?.name || "User"}</span>
+                    <div className="text-left">
+                      <span className="text-white font-medium block">{session?.user?.name || "User"}</span>
+                      {isAdmin && (
+                        <span className="text-[10px] text-amber-400 font-semibold">ADMIN</span>
+                      )}
+                    </div>
                   </motion.button>
 
                   {/* Profile Dropdown */}
@@ -148,6 +179,16 @@ export default function Navbar() {
                           <User className="w-4 h-4" />
                           <span>Profile</span>
                         </Link>
+                        {isAdmin && (
+                          <Link
+                            href="/admin"
+                            className="flex items-center gap-3 px-4 py-3 text-amber-400/80 hover:text-amber-400 hover:bg-amber-400/10 transition-all"
+                            onClick={() => setShowProfileMenu(false)}
+                          >
+                            <Shield className="w-4 h-4" />
+                            <span>Admin Dashboard</span>
+                          </Link>
+                        )}
                         <button
                           onClick={handleLogout}
                           className="w-full flex items-center gap-3 px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 transition-all"
@@ -220,10 +261,19 @@ export default function Navbar() {
                       <Link
                         href={link.href}
                         onClick={() => setIsOpen(false)}
-                        className="flex items-center gap-3 px-4 py-3 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-all"
+                        className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                          link.adminOnly
+                            ? 'text-amber-400/80 hover:text-amber-400 hover:bg-amber-400/10'
+                            : 'text-white/80 hover:text-white hover:bg-white/10'
+                        }`}
                       >
                         <link.icon className="w-5 h-5" />
                         <span className="font-medium">{link.name}</span>
+                        {link.adminOnly && (
+                          <span className="ml-auto px-2 py-0.5 rounded text-[10px] font-bold bg-amber-400/20 text-amber-400">
+                            ADMIN
+                          </span>
+                        )}
                       </Link>
                     </motion.div>
                   ))}
@@ -258,6 +308,11 @@ export default function Navbar() {
                         <p className="text-xs text-white/60 mb-1">Signed in as</p>
                         <p className="text-white font-medium">{session?.user?.name || "User"}</p>
                         <p className="text-xs text-white/60">{session?.user?.email}</p>
+                        {isAdmin && (
+                          <span className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-400/20 text-amber-400">
+                            ADMIN
+                          </span>
+                        )}
                       </div>
                       
                       <Link href="/profile" onClick={() => setIsOpen(false)}>

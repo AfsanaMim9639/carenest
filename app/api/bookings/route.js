@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import connectDB from "@/lib/db/mongodb";
+import dbConnect from "@/lib/db/mongodb";
 import Booking from "@/models/Booking";
+import { sendBookingConfirmationEmail } from "@/lib/email/emailService";
 
 // POST - Create new booking
 export async function POST(req) {
@@ -16,7 +17,7 @@ export async function POST(req) {
       );
     }
 
-    await connectDB();
+    await dbConnect();
 
     const body = await req.json();
 
@@ -51,7 +52,7 @@ export async function POST(req) {
       category: body.category,
       serviceIcon: serviceIcons[body.category] || "🏥",
       serviceRate: serviceRates[body.serviceId] || 0,
-      name: body.name,  // customer name
+      name: body.name,
       phone: body.phone,
       email: body.email || session.user.email,
       durationType: body.durationType,
@@ -60,7 +61,7 @@ export async function POST(req) {
       district: body.district,
       city: body.city,
       area: body.area,
-      address: body.address,  // full address
+      address: body.address,
       notes: body.notes || "",
       totalCost: parseFloat(body.totalCost),
       status: "pending",
@@ -69,6 +70,36 @@ export async function POST(req) {
       startTime: "TBD",
       endTime: "TBD"
     });
+
+    // ✅ Send confirmation email
+    try {
+      const emailTo = body.email || session.user.email;
+      
+      if (emailTo) {
+        await sendBookingConfirmationEmail({
+          to: emailTo,
+          booking: {
+            _id: booking._id,
+            serviceName: booking.serviceName,
+            category: booking.category,
+            name: booking.name,
+            phone: booking.phone,
+            email: booking.email,
+            duration: booking.duration,
+            durationType: booking.durationType,
+            area: booking.area,
+            city: booking.city,
+            totalCost: booking.totalCost,
+            status: booking.status
+          }
+        });
+        console.log('✅ Confirmation email sent successfully');
+      }
+    } catch (emailError) {
+      // Log email error but don't fail the booking
+      console.error('❌ Email sending failed:', emailError.message);
+      // Continue - booking is still created even if email fails
+    }
 
     return NextResponse.json(
       { 

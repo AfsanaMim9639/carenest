@@ -10,7 +10,7 @@ const UserSchema = new mongoose.Schema({
   email: {
     type: String,
     required: [true, 'Email is required'],
-    unique: true,
+    unique: true,  // ✅ ONLY unique, NO index here
     lowercase: true,
     trim: true,
     match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email']
@@ -21,7 +21,7 @@ const UserSchema = new mongoose.Schema({
       return this.provider === 'credentials';
     },
     minlength: [6, 'Password must be at least 6 characters'],
-    select: false  // Don't return password by default in queries
+    select: false
   },
   phone: {
     type: String,
@@ -72,15 +72,13 @@ const UserSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Create indexes
+// ✅ Indexes defined ONLY here
 UserSchema.index({ email: 1 });
 UserSchema.index({ phone: 1 });
 
-// Hash password before saving
+// Hash password
 UserSchema.pre('save', async function() {
-  if (!this.isModified('password') || !this.password) {
-    return;
-  }
+  if (!this.isModified('password') || !this.password) return;
   
   try {
     const salt = await bcrypt.genSalt(10);
@@ -90,22 +88,20 @@ UserSchema.pre('save', async function() {
   }
 });
 
-// Compare password method
+// Compare password
 UserSchema.methods.comparePassword = async function(candidatePassword) {
-  if (!candidatePassword || !this.password) {
-    return false;
-  }
+  if (!candidatePassword || !this.password) return false;
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Don't return password in JSON
+// toJSON
 UserSchema.methods.toJSON = function() {
   const user = this.toObject();
   delete user.password;
   return user;
 };
 
-// Delete existing model to prevent OverwriteModelError
-delete mongoose.models.User;
+// Proper model cleanup
+const User = mongoose.models.User || mongoose.model('User', UserSchema);
 
-export default mongoose.model('User', UserSchema);
+export default User;

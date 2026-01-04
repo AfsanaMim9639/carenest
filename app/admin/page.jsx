@@ -1,236 +1,172 @@
+"use client";
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { 
-  DollarSign, 
-  Calendar, 
-  Users, 
-  TrendingUp,
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertCircle
-} from 'lucide-react';
-import dbConnect from '@/lib/db/mongodb';
-import Payment from '@/models/Payment';
-import Booking from '@/models/Booking';
-import User from '@/models/User';
+  Users, Calendar, DollarSign, TrendingUp, 
+  Shield, Settings, BarChart3, Clock 
+} from "lucide-react";
 
-async function getDashboardStats() {
-  await dbConnect();
+export default function AdminDashboard() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [stats, setStats] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [
-    totalRevenue,
-    totalBookings,
-    totalUsers,
-    recentPayments,
-    statusCounts
-  ] = await Promise.all([
-    // Total Revenue
-    Payment.aggregate([
-      { $match: { status: 'succeeded' } },
-      { $group: { _id: null, total: { $sum: '$amount' } } }
-    ]),
-    
-    // Total Bookings
-    Booking.countDocuments(),
-    
-    // Total Users
-    User.countDocuments({ role: { $ne: 'admin' } }),
-    
-    // Recent Payments
-    Payment.find({ status: 'succeeded' })
-      .populate('user', 'name email')
-      .populate('booking', 'serviceDetails')
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .lean(),
-    
-    // Booking Status Counts
-    Booking.aggregate([
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
-    ])
-  ]);
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login?callbackUrl=/admin");
+    } else if (status === "authenticated" && session?.user?.role !== "admin") {
+      router.push("/");
+    } else if (status === "authenticated") {
+      fetchStats();
+    }
+  }, [status, session, router]);
 
-  const revenue = totalRevenue[0]?.total || 0;
-  const statusMap = statusCounts.reduce((acc, item) => {
-    acc[item._id] = item.count;
-    return acc;
-  }, {});
-
-  return {
-    revenue,
-    totalBookings,
-    totalUsers,
-    recentPayments,
-    statusCounts: statusMap
+  const fetchStats = async () => {
+    try {
+      const response = await fetch('/api/admin/stats');
+      const data = await response.json();
+      setStats(data);
+    } catch (error) {
+      console.error("Failed to fetch stats:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
-}
 
-export default async function AdminDashboard() {
-  const stats = await getDashboardStats();
+  if (status === "loading" || isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center pt-20">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-12 h-12 border-4 border-[#7aabb8] border-t-transparent rounded-full"
+        />
+      </div>
+    );
+  }
+
+  if (session?.user?.role !== "admin") {
+    return null;
+  }
+
+  const statCards = [
+    {
+      title: "Total Users",
+      value: stats?.totalUsers || 0,
+      icon: Users,
+      color: "from-blue-400 to-blue-600",
+      bgColor: "bg-blue-500/10"
+    },
+    {
+      title: "Total Bookings",
+      value: stats?.totalBookings || 0,
+      icon: Calendar,
+      color: "from-green-400 to-green-600",
+      bgColor: "bg-green-500/10"
+    },
+    {
+      title: "Total Revenue",
+      value: `৳${(stats?.totalRevenue || 0).toLocaleString()}`,
+      icon: DollarSign,
+      color: "from-amber-400 to-amber-600",
+      bgColor: "bg-amber-500/10"
+    },
+    {
+      title: "Pending Bookings",
+      value: stats?.pendingBookings || 0,
+      icon: Clock,
+      color: "from-purple-400 to-purple-600",
+      bgColor: "bg-purple-500/10"
+    }
+  ];
 
   return (
-    <div className="p-8 space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold gradient-text mb-2">
-          Dashboard Overview
-        </h1>
-        <p className="text-theme-200">
-          Welcome back! Here's what's happening today.
-        </p>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Total Revenue"
-          value={`$${stats.revenue.toFixed(2)}`}
-          icon={<DollarSign size={24} />}
-          trend="+12.5%"
-          trendUp={true}
-          gradient="from-green-400 to-emerald-600"
-        />
-        
-        <StatCard
-          title="Total Bookings"
-          value={stats.totalBookings}
-          icon={<Calendar size={24} />}
-          trend="+8.2%"
-          trendUp={true}
-          gradient="from-blue-400 to-indigo-600"
-        />
-        
-        <StatCard
-          title="Total Users"
-          value={stats.totalUsers}
-          icon={<Users size={24} />}
-          trend="+23.1%"
-          trendUp={true}
-          gradient="from-purple-400 to-pink-600"
-        />
-        
-        <StatCard
-          title="Active Bookings"
-          value={stats.statusCounts.confirmed || 0}
-          icon={<TrendingUp size={24} />}
-          trend="-3.4%"
-          trendUp={false}
-          gradient="from-orange-400 to-red-600"
-        />
-      </div>
-
-      {/* Booking Status Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Booking Status Cards */}
-        <div className="glass-card p-6">
-          <h2 className="text-xl font-bold text-white mb-4">
-            Booking Status
-          </h2>
-          <div className="space-y-3">
-            <StatusItem
-              label="Pending"
-              count={stats.statusCounts.pending || 0}
-              icon={<Clock size={18} />}
-              color="text-yellow-400"
-            />
-            <StatusItem
-              label="Confirmed"
-              count={stats.statusCounts.confirmed || 0}
-              icon={<CheckCircle size={18} />}
-              color="text-green-400"
-            />
-            <StatusItem
-              label="In Progress"
-              count={stats.statusCounts.in_progress || 0}
-              icon={<AlertCircle size={18} />}
-              color="text-blue-400"
-            />
-            <StatusItem
-              label="Completed"
-              count={stats.statusCounts.completed || 0}
-              icon={<CheckCircle size={18} />}
-              color="text-emerald-400"
-            />
-            <StatusItem
-              label="Cancelled"
-              count={stats.statusCounts.cancelled || 0}
-              icon={<XCircle size={18} />}
-              color="text-red-400"
-            />
+    <div className="min-h-screen pt-24 pb-20 px-4">
+      <div className="container mx-auto max-w-7xl">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8 mt-10"
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <Shield className="w-8 h-8 text-amber-400" />
+            <h1 className="text-4xl font-bold gradient-text">Admin Dashboard</h1>
           </div>
-        </div>
+          <p className="text-white/60">Welcome back, {session?.user?.name}</p>
+        </motion.div>
 
-        {/* Recent Payments */}
-        <div className="glass-card p-6">
-          <h2 className="text-xl font-bold text-white mb-4">
-            Recent Payments
-          </h2>
-          <div className="space-y-3">
-            {stats.recentPayments.map((payment) => (
-              <div
-                key={payment._id}
-                className="flex items-center justify-between p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors"
-              >
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-white">
-                    {payment.user?.name || 'Unknown User'}
-                  </p>
-                  <p className="text-xs text-theme-200">
-                    {payment.booking?.serviceDetails?.type || 'Service'}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-green-400">
-                    ${payment.amount.toFixed(2)}
-                  </p>
-                  <p className="text-xs text-theme-300">
-                    {new Date(payment.createdAt).toLocaleDateString()}
-                  </p>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {statCards.map((stat, index) => (
+            <motion.div
+              key={stat.title}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className="glass-card p-6"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className={`w-12 h-12 rounded-lg ${stat.bgColor} flex items-center justify-center`}>
+                  <stat.icon className={`w-6 h-6 bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`} style={{ WebkitTextFillColor: 'transparent' }} />
                 </div>
               </div>
-            ))}
-          </div>
+              <h3 className="text-white/60 text-sm mb-1">{stat.title}</h3>
+              <p className="text-3xl font-bold text-white">{stat.value}</p>
+            </motion.div>
+          ))}
         </div>
-      </div>
-    </div>
-  );
-}
 
-function StatCard({ title, value, icon, trend, trendUp, gradient }) {
-  return (
-    <div className="glass-card-hover p-6 relative overflow-hidden group">
-      {/* Background Gradient */}
-      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
-      
-      <div className="relative z-10">
-        <div className="flex items-center justify-between mb-4">
-          <div className={`p-3 bg-gradient-to-br ${gradient} rounded-lg`}>
-            {icon}
+        {/* Quick Actions */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="glass-card p-8"
+        >
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+            <Settings className="w-6 h-6 text-[#7aabb8]" />
+            Quick Actions
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => router.push('/admin/users')}
+              className="glass-subtle p-4 rounded-lg text-left hover:bg-white/10 transition-all"
+            >
+              <Users className="w-6 h-6 text-blue-400 mb-2" />
+              <h3 className="text-white font-semibold mb-1">Manage Users</h3>
+              <p className="text-white/60 text-sm">View and manage all users</p>
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => router.push('/admin/bookings')}
+              className="glass-subtle p-4 rounded-lg text-left hover:bg-white/10 transition-all"
+            >
+              <Calendar className="w-6 h-6 text-green-400 mb-2" />
+              <h3 className="text-white font-semibold mb-1">Manage Bookings</h3>
+              <p className="text-white/60 text-sm">View and update bookings</p>
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => router.push('/admin/analytics')}
+              className="glass-subtle p-4 rounded-lg text-left hover:bg-white/10 transition-all"
+            >
+              <BarChart3 className="w-6 h-6 text-amber-400 mb-2" />
+              <h3 className="text-white font-semibold mb-1">View Analytics</h3>
+              <p className="text-white/60 text-sm">Detailed reports and insights</p>
+            </motion.button>
           </div>
-          <span className={`text-sm font-semibold ${trendUp ? 'text-green-400' : 'text-red-400'}`}>
-            {trend}
-          </span>
-        </div>
-        
-        <h3 className="text-3xl font-bold text-white mb-1">{value}</h3>
-        <p className="text-sm text-theme-200">{title}</p>
+        </motion.div>
       </div>
-    </div>
-  );
-}
-
-function StatusItem({ label, count, icon, color }) {
-  return (
-    <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
-      <div className="flex items-center space-x-3">
-        <span className={color}>{icon}</span>
-        <span className="text-sm text-white">{label}</span>
-      </div>
-      <span className="text-sm font-bold text-white">{count}</span>
     </div>
   );
 }

@@ -19,7 +19,8 @@ export async function GET(request, { params }) {
 
     await dbConnect();
 
-    const { id } = params;
+    // ✅ FIX: Await params
+    const { id } = await params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -75,7 +76,8 @@ export async function DELETE(req, { params }) {
 
     await dbConnect();
 
-    const { id } = params;
+    // ✅ FIX: Await params
+    const { id } = await params;
 
     console.log('Attempting to cancel booking:', id);
 
@@ -151,7 +153,8 @@ export async function PATCH(request, { params }) {
 
     await dbConnect();
 
-    const { id } = params;
+    // ✅ FIX: Await params
+    const { id } = await params;
     const updates = await request.json();
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
