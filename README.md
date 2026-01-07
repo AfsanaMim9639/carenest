@@ -351,46 +351,4 @@ Contributions are welcome! Please follow these steps:
 4. Push to the branch: `git push origin feature/amazing-feature`
 5. Open a Pull Request
 
----
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 👥 Authors
-
-- **Your Name** - *Initial work* - [YourGitHub](https://github.com/yourusername)
-
----
-
-## 🙏 Acknowledgments
-
-- Zapshift resources for project requirements
-- Firebase for authentication services
-- Stripe for payment processing
-- All contributors and testers
-
----
-
-## 📞 Support
-
-For support, email support@carenest.com or join our Slack channel.
-
----
-
-## 🗺️ Roadmap
-
-- [ ] Mobile app development (React Native)
-- [ ] AI-powered caretaker matching
-- [ ] Real-time chat between users and caretakers
-- [ ] Video verification for caretakers
-- [ ] Multi-language support
-- [ ] Rating and review system
-- [ ] Emergency booking feature
-- [ ] Subscription plans for regular users
-
----
-
-**Made with ❤️ for better caregiving experiences**

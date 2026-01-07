@@ -84,7 +84,7 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="min-h-screen pt-24 pb-20 px-4">
+    <div className="min-h-screen pb-20 px-4">
       <div className="container mx-auto max-w-7xl">
         {/* Header */}
         <motion.div

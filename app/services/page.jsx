@@ -1,11 +1,16 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Baby, Heart, Activity, Stethoscope, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 export default function AllServicesPage() {
-  const allServices = [
+  const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState("All");
+
+  // Dummy data as fallback
+  const dummyServices = [
     // Baby Care (1-5)
     { id: 1, category: "Baby Care", icon: Baby, title: "Professional Baby Care", desc: "Certified babysitters for infants and toddlers", price: "৳500/hr", image: "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=400&h=300&fit=crop" },
     { id: 2, category: "Baby Care", icon: Baby, title: "Newborn Care Specialist", desc: "Expert care for newborns 0-3 months", price: "৳700/hr", image: "https://images.unsplash.com/photo-1555252333-9f8e92e65df9?w=400&h=300&fit=crop" },
@@ -28,11 +33,69 @@ export default function AllServicesPage() {
   ];
 
   const categories = ["All", "Baby Care", "Elderly Care", "Special Care"];
-  const [selectedCategory, setSelectedCategory] = useState("All");
+
+  // Fetch services from MongoDB
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const res = await fetch("/api/services");
+        if (res.ok) {
+          const data = await res.json();
+          
+          // Transform MongoDB data to match dummy data structure
+          const transformedData = data.services.map((service) => ({
+            id: service.serviceId,
+            category: service.category,
+            icon: getIconByCategory(service.category),
+            title: service.name,
+            desc: service.description.substring(0, 100) + "...",
+            price: `৳${service.rate}/${service.unit}`,
+            image: service.image || "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=400&h=300&fit=crop",
+            isActive: service.isActive,
+          }));
+
+          // Filter only active services
+          const activeServices = transformedData.filter(s => s.isActive);
+
+          // Combine dummy data with MongoDB data
+          // Remove duplicates based on ID, MongoDB data takes precedence
+          const dbIds = activeServices.map(s => s.id);
+          const uniqueDummy = dummyServices.filter(s => !dbIds.includes(s.id));
+          
+          setServices([...activeServices, ...uniqueDummy]);
+        } else {
+          // If API fails, use dummy data
+          setServices(dummyServices);
+        }
+      } catch (error) {
+        console.error("Error fetching services:", error);
+        // Use dummy data on error
+        setServices(dummyServices);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchServices();
+  }, []);
+
+  // Helper function to get icon by category
+  const getIconByCategory = (category) => {
+    switch (category) {
+      case "Baby Care":
+        return Baby;
+      case "Elderly Care":
+        return Heart;
+      case "Special Care":
+        return Activity;
+      default:
+        return Stethoscope;
+    }
+  };
 
   const filteredServices = selectedCategory === "All" 
-    ? allServices 
-    : allServices.filter(s => s.category === selectedCategory);
+    ? services 
+    : services.filter(s => s.category === selectedCategory);
 
   return (
     <div className="min-h-screen pt-24 pb-20 px-4">
@@ -75,57 +138,84 @@ export default function AllServicesPage() {
           ))}
         </motion.div>
 
+        {/* Loading State */}
+        {loading && (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="glass-card h-80 animate-pulse" />
+            ))}
+          </div>
+        )}
+
         {/* Services Grid */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredServices.map((service, index) => (
-            <motion.div
-              key={service.id}
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              whileHover={{ y: -8 }}
-              className="glass-card overflow-hidden group"
-            >
-              {/* Image */}
-              <div className="relative h-48 overflow-hidden">
-                <img 
-                  src={service.image}
-                  alt={service.title}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-                <div className="absolute top-3 right-3">
-                  <span className="px-3 py-1 rounded-full bg-gradient-to-r from-theme-50 to-theme-100 text-theme-900 font-semibold text-xs">
-                    {service.category}
-                  </span>
-                </div>
-              </div>
+        {!loading && (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredServices.map((service, index) => {
+              const IconComponent = service.icon;
+              return (
+                <motion.div
+                  key={service.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  whileHover={{ y: -8 }}
+                  className="glass-card overflow-hidden group"
+                >
+                  {/* Image */}
+                  <div className="relative h-48 overflow-hidden">
+                    <img 
+                      src={service.image}
+                      alt={service.title}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                    <div className="absolute top-3 right-3">
+                      <span className="px-3 py-1 rounded-full bg-gradient-to-r from-theme-50 to-theme-100 text-theme-900 font-semibold text-xs">
+                        {service.category}
+                      </span>
+                    </div>
+                  </div>
 
-              {/* Content */}
-              <div className="p-5">
-                <h3 className="text-lg font-bold text-white mb-2 line-clamp-2 group-hover:gradient-text transition-all">
-                  {service.title}
-                </h3>
-                <p className="text-white/70 text-sm mb-4 line-clamp-2">{service.desc}</p>
+                  {/* Content */}
+                  <div className="p-5">
+                    <h3 className="text-lg font-bold text-white mb-2 line-clamp-2 group-hover:gradient-text transition-all">
+                      {service.title}
+                    </h3>
+                    <p className="text-white/70 text-sm mb-4 line-clamp-2">{service.desc}</p>
 
-                {/* Price & CTA */}
-                <div className="flex items-center justify-between pt-4 border-t border-white/10">
-                  <span className="text-lg font-bold gradient-text">{service.price}</span>
-                  <Link href={`/service/${service.id}`}>
-                    <motion.button
-                      whileHover={{ scale: 1.1, x: 5 }}
-                      whileTap={{ scale: 0.9 }}
-                      className="w-10 h-10 rounded-full bg-gradient-to-r from-theme-50 to-theme-100 flex items-center justify-center shadow-lg"
-                      title="View Details"
-                    >
-                      <ArrowRight className="w-5 h-5 text-theme-900" />
-                    </motion.button>
-                  </Link>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+                    {/* Price & CTA */}
+                    <div className="flex items-center justify-between pt-4 border-t border-white/10">
+                      <span className="text-lg font-bold gradient-text">{service.price}</span>
+                      <Link href={`/service/${service.id}`}>
+                        <motion.button
+                          whileHover={{ scale: 1.1, x: 5 }}
+                          whileTap={{ scale: 0.9 }}
+                          className="w-10 h-10 rounded-full bg-gradient-to-r from-theme-50 to-theme-100 flex items-center justify-center shadow-lg"
+                          title="View Details"
+                        >
+                          <ArrowRight className="w-5 h-5 text-theme-900" />
+                        </motion.button>
+                      </Link>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && filteredServices.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass-card p-12 text-center"
+          >
+            <div className="text-6xl mb-4">🔍</div>
+            <h3 className="text-2xl font-bold text-white mb-2">No Services Found</h3>
+            <p className="text-gray-400">Try selecting a different category</p>
+          </motion.div>
+        )}
       </div>
     </div>
   );

@@ -3,9 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
 import SessionProvider from "@/components/SessionProvider";
+import ConditionalLayout from "@/components/ConditionalLayout"; // ✅ ADD THIS
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,9 +31,10 @@ export default async function RootLayout({ children }) {
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <SessionProvider session={session}>
-          <Navbar />
-          {children}
-          <Footer />
+          {/* ✅ Wrap children with ConditionalLayout */}
+          <ConditionalLayout>
+            {children}
+          </ConditionalLayout>
           
           {/* Toast Notifications */}
           <Toaster
@@ -42,7 +42,6 @@ export default async function RootLayout({ children }) {
             reverseOrder={false}
             gutter={8}
             toastOptions={{
-              // Default options for all toasts
               duration: 4000,
               style: {
                 background: 'rgba(17, 24, 39, 0.95)',
@@ -55,7 +54,6 @@ export default async function RootLayout({ children }) {
                 fontSize: '14px',
                 fontWeight: '500',
               },
-              // Success toast
               success: {
                 duration: 3000,
                 style: {
@@ -68,7 +66,6 @@ export default async function RootLayout({ children }) {
                   secondary: '#ffffff',
                 },
               },
-              // Error toast
               error: {
                 duration: 4000,
                 style: {
@@ -81,7 +78,6 @@ export default async function RootLayout({ children }) {
                   secondary: '#ffffff',
                 },
               },
-              // Loading toast
               loading: {
                 style: {
                   background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(147, 51, 234, 0.15) 100%)',

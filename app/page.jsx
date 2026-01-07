@@ -28,7 +28,7 @@ export default function HomePage() {
       {/* Testimonials & Success Metrics */}
       <Testimonials />
       
-     <Contact />
+     
       
     </main>
   );
