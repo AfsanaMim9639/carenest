@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import Stripe from "stripe";
-import dbConnect from "@/lib/db/mongodb"; // ✅ Changed from connectDB to dbConnect
+import dbConnect from "@/lib/db/mongodb";
 import Booking from "@/models/Booking";
 import Payment from "@/models/Payment";
 
@@ -53,68 +53,46 @@ export async function POST(req) {
 
 async function handlePaymentSuccess(paymentIntent) {
   try {
-    await dbConnect(); // ✅ Fixed
+    await dbConnect();
 
     console.log('📦 Processing payment success for:', paymentIntent.id);
 
-    const bookingData = JSON.parse(paymentIntent.metadata.bookingData);
+    const bookingId = paymentIntent.metadata.bookingId;
 
-    // Create Booking
-    const booking = await Booking.create({
-      user: paymentIntent.metadata.userId,
-      serviceId: bookingData.serviceId || 1,
-      serviceName: bookingData.serviceName,
-      category: bookingData.category,
-      serviceIcon: bookingData.serviceIcon || '🏥',
-      serviceType: bookingData.serviceType || 'baby-care',
-      serviceRate: bookingData.serviceRate || bookingData.totalCost,
-      name: bookingData.name,
-      phone: bookingData.phone,
-      email: bookingData.email || paymentIntent.metadata.userEmail,
-      durationType: bookingData.durationType,
-      duration: bookingData.duration,
-      date: bookingData.date || new Date(),
-      startTime: bookingData.startTime || "TBD",
-      endTime: bookingData.endTime || "TBD",
-      division: bookingData.division || 'Dhaka',
-      district: bookingData.district,
-      city: bookingData.city,
-      area: bookingData.area,
-      address: bookingData.address || `${bookingData.area}, ${bookingData.city}`,
-      notes: bookingData.notes || "",
-      totalCost: bookingData.totalCost,
-      status: "confirmed",
-      paymentStatus: "paid",
-      paymentMethod: "card",
-    });
+    if (!bookingId) {
+      console.error('❌ No bookingId in payment intent metadata');
+      return;
+    }
 
-    console.log('✅ Booking created:', booking._id);
+    // ✅ Find and UPDATE existing booking (don't create new one!)
+    const booking = await Booking.findById(bookingId);
 
-    // Create Payment Record
-    const payment = await Payment.create({
-      user: paymentIntent.metadata.userId,
-      booking: booking._id,
-      amount: paymentIntent.amount / 100,
-      currency: paymentIntent.currency.toUpperCase(),
-      status: "completed",
-      paymentMethod: "card",
-      stripePaymentIntentId: paymentIntent.id,
-      stripeChargeId: paymentIntent.latest_charge,
-      paidAt: new Date(),
-      metadata: {
-        serviceName: bookingData.serviceName,
-        customerEmail: paymentIntent.metadata.userEmail,
-        customerName: paymentIntent.metadata.userName,
-      },
-    });
+    if (!booking) {
+      console.error('❌ Booking not found:', bookingId);
+      return;
+    }
 
-    console.log('✅ Payment record created:', payment._id);
-
-    // Update booking with payment reference
-    booking.payment = payment._id;
+    // Update booking status
+    booking.status = 'confirmed';
+    booking.paymentStatus = 'paid';
     await booking.save();
 
-    console.log('✅ All data saved successfully!');
+    console.log('✅ Booking updated:', booking._id);
+
+    // Update payment record
+    const payment = await Payment.findOne({ 
+      stripePaymentIntentId: paymentIntent.id 
+    });
+
+    if (payment) {
+      payment.status = 'completed';
+      payment.paidAt = new Date();
+      payment.stripeChargeId = paymentIntent.latest_charge;
+      await payment.save();
+      console.log('✅ Payment record updated:', payment._id);
+    }
+
+    console.log('✅ Payment success handled!');
 
   } catch (error) {
     console.error("❌ Error handling payment success:", error);
@@ -126,22 +104,27 @@ async function handlePaymentFailed(paymentIntent) {
   try {
     await dbConnect();
 
-    await Payment.create({
-      user: paymentIntent.metadata.userId,
-      booking: null,
-      amount: paymentIntent.amount / 100,
-      currency: paymentIntent.currency.toUpperCase(),
-      status: "failed",
-      paymentMethod: "card",
-      stripePaymentIntentId: paymentIntent.id,
-      failureReason: paymentIntent.last_payment_error?.message || "Payment failed",
-      metadata: {
-        customerEmail: paymentIntent.metadata.userEmail,
-        customerName: paymentIntent.metadata.userName,
-      },
-    });
+    const bookingId = paymentIntent.metadata.bookingId;
 
-    console.log("❌ Payment failed recorded:", paymentIntent.id);
+    if (bookingId) {
+      // Update booking to cancelled
+      await Booking.findByIdAndUpdate(bookingId, {
+        status: 'cancelled',
+        paymentStatus: 'failed',
+        cancellationReason: 'Payment failed'
+      });
+    }
+
+    // Update payment record
+    await Payment.findOneAndUpdate(
+      { stripePaymentIntentId: paymentIntent.id },
+      {
+        status: 'failed',
+        failureReason: paymentIntent.last_payment_error?.message || "Payment failed",
+      }
+    );
+
+    console.log("❌ Payment failed handled:", paymentIntent.id);
   } catch (error) {
     console.error("Error handling payment failure:", error);
   }
