@@ -5,7 +5,6 @@ import dbConnect from "@/lib/db/mongodb";
 import Booking from "@/models/Booking";
 import { sendBookingConfirmationEmail } from "@/lib/email/emailService";
 
-// POST - Create new booking
 export async function POST(req) {
   try {
     const session = await getServerSession(authOptions);
@@ -18,7 +17,6 @@ export async function POST(req) {
     }
 
     await dbConnect();
-
     const body = await req.json();
 
     // Validation
@@ -30,21 +28,19 @@ export async function POST(req) {
       );
     }
 
-    // Get service icon based on category
     const serviceIcons = {
       "Baby Care": "👶",
       "Elderly Care": "👴",
       "Special Care": "🏥"
     };
 
-    // Get service rate
     const serviceRates = {
       1: 500, 2: 700, 3: 450, 4: 800, 5: 550,
       6: 600, 7: 750, 8: 700, 9: 650, 10: 12000,
       11: 900, 12: 850, 13: 700, 14: 1000
     };
 
-    // Create new booking with correct field names matching the model
+    // Create booking
     const booking = await Booking.create({
       user: session.user.id,
       serviceId: parseInt(body.serviceId),
@@ -71,34 +67,26 @@ export async function POST(req) {
       endTime: "TBD"
     });
 
-    // ✅ Send confirmation email
-    try {
-      const emailTo = body.email || session.user.email;
-      
-      if (emailTo) {
-        await sendBookingConfirmationEmail({
-          to: emailTo,
-          booking: {
-            _id: booking._id,
-            serviceName: booking.serviceName,
-            category: booking.category,
-            name: booking.name,
-            phone: booking.phone,
-            email: booking.email,
-            duration: booking.duration,
-            durationType: booking.durationType,
-            area: booking.area,
-            city: booking.city,
-            totalCost: booking.totalCost,
-            status: booking.status
-          }
-        });
-        console.log('✅ Confirmation email sent successfully');
-      }
-    } catch (emailError) {
-      // Log email error but don't fail the booking
-      console.error('❌ Email sending failed:', emailError.message);
-      // Continue - booking is still created even if email fails
+    console.log('✅ Booking created:', booking._id.toString());
+
+    // ✅ Send email (non-blocking)
+    const emailTo = body.email || session.user.email;
+    
+    if (emailTo) {
+      // Don't await - send in background
+      sendBookingConfirmationEmail({
+        to: emailTo,
+        customerName: booking.name,
+        bookingId: booking._id.toString(),
+        serviceName: booking.serviceName,
+        duration: `${booking.duration} ${booking.durationType}`,
+        totalCost: booking.totalCost,
+        location: `${booking.area}, ${booking.city}`,
+        date: new Date(booking.bookingDate).toLocaleDateString(),
+        phone: booking.phone
+      }).catch(err => {
+        console.error('❌ Background email failed:', err.message);
+      });
     }
 
     return NextResponse.json(
@@ -106,7 +94,7 @@ export async function POST(req) {
         success: true,
         message: "Booking created successfully",
         booking: {
-          id: booking._id,
+          id: booking._id.toString(),
           serviceName: booking.serviceName,
           status: booking.status,
           totalCost: booking.totalCost
@@ -116,7 +104,7 @@ export async function POST(req) {
     );
 
   } catch (error) {
-    console.error("Booking creation error:", error);
+    console.error("❌ Booking error:", error);
     return NextResponse.json(
       { error: error.message || "Failed to create booking" },
       { status: 500 }

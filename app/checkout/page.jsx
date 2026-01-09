@@ -223,7 +223,7 @@ function CheckoutForm({ bookingDetails, clientSecret }) {
       setIsProcessing(false);
     } else if (paymentIntent && paymentIntent.status === 'succeeded') {
       toast.success('Payment successful!');
-      router.push(`/booking-success?payment_intent=${paymentIntent.id}`);
+      router.push(`/booking-success?paymentIntent=${paymentIntent.id}`); // ✅ Changed
     } else {
       setIsProcessing(false);
     }

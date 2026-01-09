@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { 
   ArrowLeft, Calendar, Clock, MapPin, 
   Phone, Mail, User, FileText, CheckCircle,
-  DollarSign, Home
+  DollarSign, CreditCard
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -62,6 +62,7 @@ export default function BookingPage() {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [totalCost, setTotalCost] = useState(0);
 
@@ -72,85 +73,89 @@ export default function BookingPage() {
       const rate = service.rate;
       
       if (formData.durationType === "days") {
-        // For services billed per day (like 24/7 Live-in Care)
         if (service.unit === "day") {
           setTotalCost(rate * duration);
         } else {
-          // For hourly services converted to days (24 hours per day)
           setTotalCost(rate * duration * 24);
         }
       } else {
-        // For hours
         setTotalCost(rate * duration);
       }
     }
   }, [formData.duration, formData.durationType, service]);
 
-
   // Restore pending booking data after login
-useEffect(() => {
-  const pendingBooking = localStorage.getItem('pendingBooking');
-  if (pendingBooking) {
-    try {
-      const data = JSON.parse(pendingBooking);
-      if (data.serviceId === serviceId) {
-        setFormData(data.formData);
-        setTotalCost(data.totalCost);
-        toast.info("Your booking details have been restored", {
-          duration: 3000,
-        });
+  useEffect(() => {
+    const pendingBooking = localStorage.getItem('pendingBooking');
+    if (pendingBooking) {
+      try {
+        const data = JSON.parse(pendingBooking);
+        if (data.serviceId === serviceId) {
+          setFormData(data.formData);
+          setTotalCost(data.totalCost);
+          toast.info("Your booking details have been restored", {
+            duration: 3000,
+          });
+        }
+      } catch (error) {
+        console.error("Error restoring booking:", error);
       }
-    } catch (error) {
-      console.error("Error restoring booking:", error);
     }
-  }
-}, [serviceId]);
+  }, [serviceId]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value,
-      // Reset district when division changes
       ...(name === "division" ? { district: "", city: "", area: "" } : {})
     }));
   };
 
+  // Check if user is logged in
+  const checkAuth = async () => {
+    try {
+      const sessionResponse = await fetch('/api/auth/session');
+      const sessionData = await sessionResponse.json();
+      
+      if (!sessionData?.user) {
+        toast.error("Please login to complete your booking", {
+          duration: 4000,
+          icon: "🔒",
+        });
+        localStorage.setItem('pendingBooking', JSON.stringify({
+          serviceId,
+          serviceName: service.name,
+          category: service.category,
+          formData,
+          totalCost
+        }));
+        router.push(`/login?callbackUrl=/booking/${serviceId}`);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error("Session check error:", error);
+      return false;
+    }
+  };
+
+  // Handle booking without payment (existing)
  const handleSubmit = async (e) => {
   e.preventDefault();
   
-  // Check if user is logged in BEFORE submitting
-  try {
-    const sessionResponse = await fetch('/api/auth/session');
-    const sessionData = await sessionResponse.json();
-    
-    if (!sessionData?.user) {
-      toast.error("Please login to complete your booking", {
-        duration: 4000,
-        icon: "🔒",
-      });
-      // Save form data to localStorage before redirecting
-      localStorage.setItem('pendingBooking', JSON.stringify({
-        serviceId,
-        serviceName: service.name,
-        category: service.category,
-        formData,
-        totalCost
-      }));
-      router.push(`/login?callbackUrl=/booking/${serviceId}`);
-      return;
-    }
-  } catch (error) {
-    console.error("Session check error:", error);
-  }
+  const isAuthenticated = await checkAuth();
+  if (!isAuthenticated) return;
 
   setIsSubmitting(true);
 
-  // Prepare booking data
   const bookingData = {
     serviceId,
     serviceName: service.name,
     category: service.category,
+    serviceIcon: "🏥",
+    serviceType: "baby-care",
+    serviceRate: service.rate,
     ...formData,
     totalCost,
     status: "pending",
@@ -158,12 +163,9 @@ useEffect(() => {
   };
 
   try {
-    // Actual API call to save booking
     const response = await fetch('/api/bookings', {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(bookingData)
     });
 
@@ -173,13 +175,10 @@ useEffect(() => {
       throw new Error(data.error || 'Failed to create booking');
     }
 
-    // Success - clear any pending booking data
     localStorage.removeItem('pendingBooking');
     
-    setIsSubmitted(true);
-    toast.success("Booking created successfully!", {
-      duration: 3000,
-    });
+    // ✅ Remove toast, directly redirect
+    router.push(`/booking-success?id=${data.booking.id}`);
 
   } catch (error) {
     console.error("Booking error:", error);
@@ -191,6 +190,44 @@ useEffect(() => {
   }
 };
 
+  // Handle payment checkout (new)
+  const handlePayNow = async (e) => {
+    e.preventDefault();
+    
+    const isAuthenticated = await checkAuth();
+    if (!isAuthenticated) return;
+
+    setIsProcessingPayment(true);
+
+    const bookingData = {
+      serviceId,
+      serviceName: service.name,
+      category: service.category,
+      serviceIcon: "🏥",
+      serviceType: "baby-care",
+      serviceRate: service.rate,
+      ...formData,
+      totalCost,
+    };
+
+    try {
+      // Encode booking data for checkout page
+      const encodedData = encodeURIComponent(JSON.stringify(bookingData));
+      
+      localStorage.removeItem('pendingBooking');
+      
+      // Redirect to checkout page
+      router.push(`/checkout?data=${encodedData}`);
+      
+    } catch (error) {
+      console.error("Payment initiation error:", error);
+      toast.error("Failed to initiate payment", {
+        duration: 4000,
+      });
+      setIsProcessingPayment(false);
+    }
+  };
+
   if (!service) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -200,72 +237,6 @@ useEffect(() => {
             <button className="glass-button px-6 py-3">View All Services</button>
           </Link>
         </div>
-      </div>
-    );
-  }
-
-  if (isSubmitted) {
-    return (
-      <div className="min-h-screen pt-24 pb-20 px-4 flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="glass-card p-8 max-w-md w-full text-center"
-        >
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: "spring" }}
-            className="w-20 h-20 rounded-full bg-gradient-to-r from-green-400 to-green-600 flex items-center justify-center mx-auto mb-6"
-          >
-            <CheckCircle className="w-12 h-12 text-white" />
-          </motion.div>
-          
-          <h2 className="text-3xl font-bold text-white mb-4">
-            Booking Confirmed! 🎉
-          </h2>
-          <p className="text-white/70 mb-2">
-            Your booking has been submitted successfully.
-          </p>
-          <p className="text-white/60 text-sm mb-6">
-            <strong>Status:</strong> Pending | <strong>Booking ID:</strong> #{Math.random().toString(36).substr(2, 9).toUpperCase()}
-          </p>
-          <div className="glass-subtle p-4 rounded-lg mb-8 text-left">
-            <p className="text-white/80 text-sm mb-2">
-              <strong>Service:</strong> {service.name}
-            </p>
-            <p className="text-white/80 text-sm mb-2">
-              <strong>Duration:</strong> {formData.duration} {formData.durationType}
-            </p>
-            <p className="text-white/80 text-sm">
-              <strong>Total Cost:</strong> <span className="gradient-text font-bold">৳{totalCost.toLocaleString()}</span>
-            </p>
-          </div>
-          <p className="text-white/70 text-sm mb-8">
-            We'll contact you within 1 hour to confirm the details.
-          </p>
-          
-          <div className="space-y-3">
-            <Link href="/">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="w-full mt-10 px-6 py-3 rounded-lg bg-gradient-to-r from-theme-50 to-theme-100 text-theme-900 font-bold"
-              >
-                Back to Home
-              </motion.button>
-            </Link>
-            <Link href="/services">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="w-full px-6 py-3 rounded-lg glass-button"
-              >
-                View All Services
-              </motion.button>
-            </Link>
-          </div>
-        </motion.div>
       </div>
     );
   }
@@ -517,27 +488,63 @@ useEffect(() => {
                 </div>
               </div>
 
-              {/* Submit Button */}
-              <motion.button
-                type="submit"
-                disabled={isSubmitting}
-                whileHover={{ scale: isSubmitting ? 1 : 1.02 }}
-                whileTap={{ scale: isSubmitting ? 1 : 0.98 }}
-                className="w-full py-4 rounded-lg bg-gradient-to-r from-theme-50 to-theme-100 text-theme-900 font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      className="w-5 h-5 border-2 border-theme-900 border-t-transparent rounded-full"
-                    />
-                    Processing...
-                  </span>
-                ) : (
-                  "Confirm Booking"
-                )}
-              </motion.button>
+              {/* Action Buttons */}
+              <div className="grid md:grid-cols-2 gap-4 pt-6 border-t border-white/10">
+                {/* Confirm Booking (Pay Later) */}
+                <motion.button
+                  type="submit"
+                  disabled={isSubmitting || isProcessingPayment}
+                  whileHover={{ scale: isSubmitting ? 1 : 1.02 }}
+                  whileTap={{ scale: isSubmitting ? 1 : 0.98 }}
+                  className="w-full py-4 rounded-lg border-2 border-theme-100 text-white font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/5 transition-all"
+                >
+                  {isSubmitting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                      />
+                      Processing...
+                    </span>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-5 h-5 inline mr-2" />
+                      Confirm Booking (Pay Later)
+                    </>
+                  )}
+                </motion.button>
+
+                {/* Pay Now */}
+                <motion.button
+                  type="button"
+                  onClick={handlePayNow}
+                  disabled={isSubmitting || isProcessingPayment}
+                  whileHover={{ scale: isProcessingPayment ? 1 : 1.02 }}
+                  whileTap={{ scale: isProcessingPayment ? 1 : 0.98 }}
+                  className="w-full py-4 rounded-lg bg-gradient-to-r from-theme-50 to-theme-100 text-theme-900 font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isProcessingPayment ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-5 h-5 border-2 border-theme-900 border-t-transparent rounded-full"
+                      />
+                      Redirecting...
+                    </span>
+                  ) : (
+                    <>
+                      <CreditCard className="w-5 h-5 inline mr-2" />
+                      Pay Now
+                    </>
+                  )}
+                </motion.button>
+              </div>
+
+              <p className="text-white/60 text-sm text-center mt-4">
+                Choose "Confirm Booking" to book now and pay later, or "Pay Now" to complete payment immediately
+              </p>
             </form>
           </motion.div>
 
@@ -572,7 +579,7 @@ useEffect(() => {
 
             <div className="glass-subtle p-4 rounded-lg mb-4">
               <p className="text-white/60 text-xs leading-relaxed">
-                <strong className="text-white">Note:</strong> After booking confirmation, our team will contact you to finalize the schedule. Payment can be made after service confirmation.
+                <strong className="text-white">Note:</strong> You can choose to pay now or after service confirmation. Our team will contact you to finalize the schedule.
               </p>
             </div>
 
